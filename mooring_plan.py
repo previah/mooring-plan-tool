@@ -1,0 +1,1150 @@
+import tkinter as tk
+from tkinter import filedialog, simpledialog, messagebox
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg,
+    NavigationToolbar2Tk
+)
+
+import csv
+import math
+import fitz
+from PIL import Image
+
+import json
+
+
+class MooringPlanner:
+
+    def save_project(self):
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".mpl",
+            filetypes=[("Mooring Project", "*.mpl")]
+        )
+
+        if not filename:
+            return
+
+        data = {
+            "background_file": self.background_file,
+            "scale_factor": self.scale_factor,
+            "origin": self.origin,
+            "barge_points": self.barge_points,
+            "quay_points": self.quay_points,
+            "lines": self.lines,
+            "barge_counter": self.barge_counter,
+            "quay_counter": self.quay_counter
+        }
+
+        with open(filename, "w") as f:
+            json.dump(data, f, indent=4)
+
+        messagebox.showinfo(
+            "Save",
+            "Project saved successfully."
+        )
+
+    def load_project(self):
+
+        filename = filedialog.askopenfilename(
+            filetypes=[
+                ("Mooring Project", "*.mpl")
+            ]
+        )
+
+        if not filename:
+            return
+
+        try:
+
+            with open(filename, "r") as f:
+                data = json.load(f)
+                self.background_file = data.get(
+                    "background_file"
+                )
+
+            self.load_background(self.background_file)
+
+            self.scale_factor = data.get("scale_factor")
+
+            origin = data.get("origin")
+
+            if origin is not None:
+                self.origin = tuple(origin)
+            else:
+                self.origin = None
+
+            self.barge_points = {
+                k: tuple(v)
+                for k, v in data.get("barge_points", {}).items()
+            }
+
+            self.quay_points = {
+                k: tuple(v)
+                for k, v in data.get("quay_points", {}).items()
+            }
+
+            self.lines = data.get("lines", [])
+
+            self.barge_counter = data.get(
+                "barge_counter",
+                len(self.barge_points) + 1
+            )
+
+            self.quay_counter = data.get(
+                "quay_counter",
+                len(self.quay_points) + 1
+            )
+
+            self.pending_line_start = None
+            self.pending_line_end = None
+
+            self.redraw()
+
+            messagebox.showinfo(
+                "Load Project",
+                "Project loaded successfully."
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Load Error",
+                f"Unable to load project:\n\n{e}"
+            )
+
+        if self.background_file:
+
+            try:
+
+                if self.background_file.lower().endswith(".pdf"):
+
+                    doc = fitz.open(
+                        self.background_file
+                    )
+
+                    page = doc.load_page(0)
+
+                    pix = page.get_pixmap(
+                        matrix=fitz.Matrix(2, 2)
+                    )
+
+                    arr = np.frombuffer(
+                        pix.samples,
+                        dtype=np.uint8
+                    )
+
+                    arr = arr.reshape(
+                        pix.height,
+                        pix.width,
+                        pix.n
+                    )
+
+                    self.image_array = arr
+
+                else:
+
+                    self.image_array = np.array(
+                        Image.open(
+                            self.background_file
+                        )
+                    )
+
+            except Exception as e:
+
+                messagebox.showwarning(
+                    "Drawing Missing",
+                    f"Project loaded.\n\n"
+                    f"The original drawing could not be found:\n\n"
+                    f"{self.background_file}\n\n"
+                    f"You can load it manually."
+                )
+
+    def __init__(self, root):
+
+        self.root = root
+        self.root.title("Mooring Plan Creator")
+
+        self.root.protocol(
+            "WM_DELETE_WINDOW",
+            self.on_close
+        )
+
+        self.mode = "none"
+
+        self.image = None
+        self.image_array = None
+        self.background_file = None
+
+        self.scale_points = []
+        self.scale_factor = None
+
+        self.origin = None
+
+        self.barge_points = {}
+        self.quay_points = {}
+
+        self.barge_counter = 1
+        self.quay_counter = 1
+
+        self.lines = []
+
+        self.undo_stack = []
+        self.redo_stack = []
+
+        self.pending_line_start = None
+        self.pending_line_end = None
+
+        self.create_gui()
+
+    # =====================================================
+    # GUI
+    # =====================================================
+
+    def create_gui(self):
+
+        top = tk.Frame(self.root)
+        top.pack(fill=tk.X)
+
+        tk.Button(
+            top,
+            text="Load Drawing",
+            command=self.load_file
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Save Project",
+            command=self.save_project
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Load Project",
+            command=self.load_project
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Scale",
+            command=lambda: self.set_mode("scale")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Origin",
+            command=lambda: self.set_mode("origin")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Barge Bollard",
+            command=lambda: self.set_mode("barge")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Quay Bollard",
+            command=lambda: self.set_mode("quay")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Add Line",
+            command=lambda: self.set_mode("line")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Undo",
+            command=self.undo
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Redo",
+            command=self.redo
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Delete",
+            command=lambda: self.set_mode("delete")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Export",
+            command=self.export_data
+        ).pack(side=tk.LEFT)
+
+        self.status = tk.Label(
+            self.root,
+            text="Ready"
+        )
+
+        self.status.pack(fill=tk.X)
+
+        self.fig, self.ax = plt.subplots(figsize=(10, 8))
+
+        self.canvas = FigureCanvasTkAgg(
+            self.fig,
+            master=self.root
+        )
+
+        self.canvas.draw()
+
+        self.canvas.get_tk_widget().pack(
+            fill=tk.BOTH,
+            expand=True
+        )
+
+        toolbar = NavigationToolbar2Tk(
+            self.canvas,
+            self.root
+        )
+
+        toolbar.update()
+
+        self.canvas.mpl_connect(
+            "button_press_event",
+            self.on_click
+        )
+
+    # =====================================================
+    # MODE
+    # =====================================================
+
+    def set_mode(self, mode):
+
+        try:
+
+            toolbar = self.canvas.toolbar
+
+            if toolbar is not None:
+
+                if toolbar.mode != "":
+
+                    if "zoom" in toolbar.mode.lower():
+                        toolbar.zoom()
+
+                    elif "pan" in toolbar.mode.lower():
+                        toolbar.pan()
+
+        except Exception:
+            pass
+
+        self.mode = mode
+
+        self.status.config(
+            text=f"Mode: {mode}"
+        )
+
+    # =====================================================
+    # FILE LOAD
+    # =====================================================
+
+    def load_file(self):
+
+        file = filedialog.askopenfilename(
+            filetypes=[
+                (
+                    "Files",
+                    "*.png *.jpg *.jpeg *.bmp *.tif *.pdf"
+                )
+            ]
+        )
+
+        if not file:
+            return
+
+        self.load_background(file)
+
+        self.background_file = file
+
+        if file.lower().endswith(".pdf"):
+
+            doc = fitz.open(file)
+            page = doc.load_page(0)
+
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+
+            arr = np.frombuffer(
+                pix.samples,
+                dtype=np.uint8
+            )
+
+            arr = arr.reshape(
+                pix.height,
+                pix.width,
+                pix.n
+            )
+
+            self.image_array = arr
+
+        else:
+
+            self.image_array = np.array(
+                Image.open(file)
+            )
+
+        self.redraw()
+
+    # =====================================================
+    # DRAWING
+    # =====================================================
+
+    def redraw(self):
+
+        self.ax.clear()
+
+        if self.image_array is not None:
+            self.ax.imshow(self.image_array)
+
+        # scale points
+
+        for i, p in enumerate(self.scale_points):
+
+            self.ax.plot(
+                p[0],
+                p[1],
+                "ro"
+            )
+
+            self.ax.text(
+                p[0],
+                p[1],
+                f"S{i+1}",
+                color="red"
+            )
+
+        # origin
+
+        if self.origin is not None:
+
+            self.ax.plot(
+                self.origin[0],
+                self.origin[1],
+                marker="+",
+                markersize=15,
+                color="cyan"
+            )
+
+            self.ax.text(
+                self.origin[0],
+                self.origin[1],
+                "Origin",
+                color="cyan"
+            )
+
+        # barge
+
+        for name, p in self.barge_points.items():
+
+            if name == self.pending_line_start:
+                self.ax.plot(
+                    p[0],
+                    p[1],
+                    marker="s",
+                    markersize=14,
+                    color="yellow",
+                    markeredgecolor="black"
+                )
+            else:
+                self.ax.plot(
+                    p[0],
+                    p[1],
+                    "rs"
+                )
+
+            self.ax.text(
+                p[0],
+                p[1],
+                name,
+                color="red"
+            )
+
+        # quay
+
+        for name, p in self.quay_points.items():
+
+            if name == self.pending_line_end:
+                self.ax.plot(
+                    p[0],
+                    p[1],
+                    marker="o",
+                    markersize=14,
+                    color="yellow",
+                    markeredgecolor="black"
+                )
+            else:
+                self.ax.plot(
+                    p[0],
+                    p[1],
+                    "bo"
+                )
+
+            self.ax.text(
+                p[0],
+                p[1],
+                name,
+                color="blue"
+            )
+
+        # lines
+
+        for line in self.lines:
+
+            p1 = self.barge_points[line["from"]]
+            p2 = self.quay_points[line["to"]]
+
+            self.ax.plot(
+                [p1[0], p2[0]],
+                [p1[1], p2[1]],
+                "g-",
+                linewidth=2
+            )
+
+            mx = (p1[0] + p2[0]) / 2
+            my = (p1[1] + p2[1]) / 2
+
+            self.ax.text(
+                mx,
+                my,
+                line["name"],
+                color="green"
+            )
+
+        self.ax.set_title("Mooring Plan")
+
+        self.canvas.draw()
+
+    # =====================================================
+    # CLICK
+    # =====================================================
+
+    def on_click(self, event):
+
+        # Don't create points while using zoom/pan
+        if self.canvas.toolbar.mode:
+            self.status.config(
+            text = f"Navigation mode active: {self.canvas.toolbar.mode}"
+            )
+            return
+
+        if event.xdata is None or event.ydata is None:
+            return
+
+        x = float(event.xdata)
+        y = float(event.ydata)
+
+        if self.mode == "scale":
+
+            self.scale_mode(x, y)
+
+        elif self.mode == "origin":
+
+            self.origin_mode(x, y)
+
+        elif self.mode == "barge":
+
+            self.barge_mode(x, y)
+
+        elif self.mode == "quay":
+
+            self.quay_mode(x, y)
+
+        elif self.mode == "line":
+
+            self.line_mode(x, y)
+
+        elif self.mode == "delete":
+
+            self.delete_mode(x, y)
+    # =====================================================
+    # SCALE
+    # =====================================================
+
+    def scale_mode(self, x, y):
+
+        self.scale_points.append((x, y))
+
+        if len(self.scale_points) == 2:
+
+            p1 = self.scale_points[0]
+            p2 = self.scale_points[1]
+
+            pixels = math.dist(p1, p2)
+
+            real = simpledialog.askfloat(
+                "Scale",
+                "Actual distance"
+            )
+
+            self.scale_factor = real / pixels
+
+            messagebox.showinfo(
+                "Scale",
+                f"Scale factor:\n{self.scale_factor:.6f}"
+            )
+
+        self.redraw()
+
+    # =====================================================
+    # ORIGIN
+    # =====================================================
+
+    def origin_mode(self, x, y):
+
+        self.origin = (x, y)
+
+        self.undo_stack.append(
+            ("origin", self.origin)
+        )
+
+        self.redraw()
+
+    # =====================================================
+    # BARGE
+    # =====================================================
+
+    def barge_mode(self, x, y):
+
+        name = f"B{self.barge_counter}"
+
+        self.barge_points[name] = (x, y)
+
+        self.barge_counter += 1
+
+        self.undo_stack.append(
+            ("barge", name)
+        )
+
+        self.redraw()
+
+    # =====================================================
+    # QUAY
+    # =====================================================
+
+    def quay_mode(self, x, y):
+
+        name = f"Q{self.quay_counter}"
+
+        self.quay_points[name] = (x, y)
+
+        self.quay_counter += 1
+
+        self.undo_stack.append(
+            ("quay", name)
+        )
+
+        self.redraw()
+
+    # =====================================================
+    # FIND POINT
+    # =====================================================
+
+    def nearest_barge(self, x, y):
+
+        best = None
+        dist = 20
+
+        for name, p in self.barge_points.items():
+
+            d = math.dist(
+                (x, y),
+                p
+            )
+
+            if d < dist:
+                dist = d
+                best = name
+
+        return best
+
+    def nearest_quay(self, x, y):
+
+        best = None
+        dist = 20
+
+        for name, p in self.quay_points.items():
+
+            d = math.dist(
+                (x, y),
+                p
+            )
+
+            if d < dist:
+                dist = d
+                best = name
+
+        return best
+
+    # =====================================================
+    # LINE MODE
+    # =====================================================
+
+    def line_mode(self, x, y):
+
+        if self.pending_line_start is None:
+
+            b = self.nearest_barge(x, y)
+
+            if b is not None:
+                self.pending_line_start = b
+
+                self.status.config(
+                    text=f"{b} selected. Pick quay bollard."
+                )
+
+                self.redraw()
+
+            return
+
+        q = self.nearest_quay(x, y)
+
+        if q is None:
+            return
+
+        self.pending_line_end = q
+
+        self.redraw()
+
+        line_name = simpledialog.askstring(
+            "Line Name",
+            "Enter line name:"
+        )
+
+        if not line_name:
+            return
+
+        item = {
+            "name": line_name,
+            "from": self.pending_line_start,
+            "to": q
+        }
+
+        self.lines.append(item)
+
+        self.undo_stack.append(
+            ("line", item)
+        )
+
+        self.pending_line_start = None
+        self.pending_line_end = None
+
+        self.redraw()
+
+    # =====================================================
+    # UNDO
+    # =====================================================
+
+    def undo(self):
+
+        if not self.undo_stack:
+            return
+
+        action = self.undo_stack.pop()
+
+        self.redo_stack.append(action)
+
+        kind = action[0]
+
+        if kind == "barge":
+            del self.barge_points[action[1]]
+
+        elif kind == "quay":
+            del self.quay_points[action[1]]
+
+        elif kind == "line":
+            self.lines.remove(action[1])
+
+        elif kind == "origin":
+            self.origin = None
+
+        elif kind == "delete_barge":
+
+            name = action[1]["name"]
+            point = action[1]["point"]
+
+            self.barge_points[name] = point
+
+        elif kind == "delete_quay":
+
+            name = action[1]["name"]
+            point = action[1]["point"]
+
+            self.quay_points[name] = point
+
+        elif kind == "delete_line":
+
+            self.lines.append(action[1])
+
+        self.redraw()
+
+    # =====================================================
+    # REDO
+    # =====================================================
+
+    def redo(self):
+
+        if not self.redo_stack:
+            return
+
+        action = self.redo_stack.pop()
+
+        self.undo_stack.append(action)
+
+        kind = action[0]
+
+        if kind == "line":
+
+            self.lines.append(action[1])
+
+        elif kind == "delete_barge":
+
+            name = action[1]["name"]
+
+            if name in self.barge_points:
+                del self.barge_points[name]
+
+        elif kind == "delete_quay":
+
+            name = action[1]["name"]
+
+            if name in self.quay_points:
+                del self.quay_points[name]
+
+        elif kind == "delete_line":
+
+            if action[1] in self.lines:
+                self.lines.remove(action[1])
+
+        self.redraw()
+
+    # =====================================================
+    # EXPORT
+    # =====================================================
+
+    def export_data(self):
+
+        if self.origin is None:
+            messagebox.showerror(
+                "Error",
+                "Origin not set."
+            )
+            return
+
+        if self.scale_factor is None:
+            messagebox.showwarning(
+                "Warning",
+                "Scale not defined. \n\n"
+                "Coordinates and line lengths will be exported in pixels"
+            )
+
+        folder = filedialog.askdirectory()
+
+        if not folder:
+            return
+
+        bollard_file = folder + "/bollards.csv"
+
+        with open(
+            bollard_file,
+            "w",
+            newline=""
+        ) as f:
+
+            writer = csv.writer(f)
+
+            writer.writerow(
+                [
+                    "Name",
+                    "Type",
+                    "X",
+                    "Y"
+                ]
+            )
+
+            ox, oy = self.origin
+
+            for name, p in self.barge_points.items():
+
+                if self.scale_factor is None:
+                    x = p[0] - ox
+                    y = oy - p[1]
+                else:
+                    x = (p[0] - ox) * self.scale_factor
+                    y = (oy - p[1]) * self.scale_factor
+
+                writer.writerow(
+                    [name, "Barge", x, y]
+                )
+
+            for name, p in self.quay_points.items():
+
+                if self.scale_factor is None:
+                    x = p[0] - ox
+                    y = oy - p[1]
+                else:
+                    x = (p[0] - ox) * self.scale_factor
+                    y = (oy - p[1]) * self.scale_factor
+
+                writer.writerow(
+                    [name, "Quay", x, y]
+                )
+
+        line_file = folder + "/mooring_lines.csv"
+
+        with open(
+            line_file,
+            "w",
+            newline=""
+        ) as f:
+
+            writer = csv.writer(f)
+
+            writer.writerow(
+                [
+                    "Name",
+                    "From",
+                    "To",
+                    "Length",
+                    "Angle"
+                ]
+            )
+
+            for line in self.lines:
+
+                p1 = self.barge_points[line["from"]]
+                p2 = self.quay_points[line["to"]]
+
+                if self.scale_factor is not None:
+                    length = (
+                        math.dist(p1, p2)
+                        * self.scale_factor
+                    )
+                else:
+                    length = (
+                            math.dist(p1, p2)
+                    )
+
+                angle = math.degrees(
+                    math.atan2(
+                        p2[1] - p1[1],
+                        p2[0] - p1[0]
+                    )
+                )
+
+                writer.writerow(
+                    [
+                        line["name"],
+                        line["from"],
+                        line["to"],
+                        length,
+                        angle
+                    ]
+                )
+
+        self.fig.savefig(
+            folder +
+            "/mooring_plan.jpg",
+            dpi=300
+        )
+
+        messagebox.showinfo(
+            "Export",
+            "Files exported."
+        )
+
+    def load_background(self, filename):
+
+        self.background_file = filename
+
+        if filename.lower().endswith(".pdf"):
+
+            doc = fitz.open(filename)
+            page = doc.load_page(0)
+
+            pix = page.get_pixmap(
+                matrix=fitz.Matrix(2, 2)
+            )
+
+            arr = np.frombuffer(
+                pix.samples,
+                dtype=np.uint8
+            )
+
+            arr = arr.reshape(
+                pix.height,
+                pix.width,
+                pix.n
+            )
+
+            if pix.n == 4:
+                arr = arr[:, :, :3]
+
+            self.image_array = arr
+
+        else:
+
+            self.image_array = np.array(
+                Image.open(filename)
+            )
+
+    def delete_mode(self, x, y):
+
+        # Try line first
+        line = self.nearest_line(x, y)
+
+        if line is not None:
+
+            answer = messagebox.askyesno(
+                "Delete Line",
+                f"Delete line '{line['name']}'?"
+            )
+
+            if answer:
+                self.undo_stack.append(
+                    ("delete_line", line.copy())
+                )
+
+                self.lines.remove(line)
+
+                self.redraw()
+
+            return
+
+        # Try barge bollard
+        b = self.nearest_barge(x, y)
+
+        if b is not None:
+
+            answer = messagebox.askyesno(
+                "Delete Bollard",
+                f"Delete bollard '{b}'?"
+            )
+
+            if answer:
+                # Remove connected lines
+                self.lines = [
+                    l for l in self.lines
+                    if l["from"] != b
+                ]
+
+                deleted_data = {
+                    "name": b,
+                    "point": self.barge_points[b]
+                }
+
+                self.undo_stack.append(
+                    ("delete_barge", deleted_data)
+                )
+
+                del self.barge_points[b]
+
+                self.redraw()
+
+            return
+
+        # Try quay bollard
+        q = self.nearest_quay(x, y)
+
+        if q is not None:
+
+            answer = messagebox.askyesno(
+                "Delete Bollard",
+                f"Delete bollard '{q}'?"
+            )
+
+            if answer:
+                self.lines = [
+                    l for l in self.lines
+                    if l["to"] != q
+                ]
+
+                deleted_data = {
+                    "name": q,
+                    "point": self.quay_points[q]
+                }
+
+                self.undo_stack.append(
+                    ("delete_quay", deleted_data)
+                )
+
+                del self.quay_points[q]
+
+                self.redraw()
+
+    def nearest_line(self, x, y):
+
+        threshold = 10
+
+        for line in self.lines:
+
+            p1 = self.barge_points[line["from"]]
+            p2 = self.quay_points[line["to"]]
+
+            distance = self.point_to_segment_distance(
+                x, y,
+                p1[0], p1[1],
+                p2[0], p2[1]
+            )
+
+            if distance < threshold:
+                return line
+
+        return None
+
+    def point_to_segment_distance(
+            self,
+            px, py,
+            x1, y1,
+            x2, y2):
+
+        dx = x2 - x1
+        dy = y2 - y1
+
+        if dx == 0 and dy == 0:
+            return math.dist(
+                (px, py),
+                (x1, y1)
+            )
+
+        t = (
+                    ((px - x1) * dx) +
+                    ((py - y1) * dy)
+            ) / (dx * dx + dy * dy)
+
+        t = max(0, min(1, t))
+
+        nearest_x = x1 + t * dx
+        nearest_y = y1 + t * dy
+
+        return math.dist(
+            (px, py),
+            (nearest_x, nearest_y)
+        )
+
+    def on_close(self):
+
+        answer = messagebox.askyesno(
+            "Exit",
+            "Close Mooring Planner?"
+        )
+
+        if answer:
+            plt.close('all')
+
+            self.root.quit()
+
+            self.root.destroy()
+
+root = tk.Tk()
+
+app = MooringPlanner(root)
+
+root.mainloop()
