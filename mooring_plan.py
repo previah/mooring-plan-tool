@@ -30,6 +30,16 @@ class MooringPlanner:
 
         self.mode = "none"
 
+        self.shift_pressed = False
+
+        self.panning = False
+
+        self.pan_start_x = None
+        self.pan_start_y = None
+
+        self.xlim_start = None
+        self.ylim_start = None
+
         self.current_xlim = None
         self.current_ylim = None
 
@@ -79,6 +89,26 @@ class MooringPlanner:
         self.root.bind(
             "<KeyRelease-Control_R>",
             self.ctrl_release
+        )
+
+        self.root.bind(
+            "<KeyPress-Shift_L>",
+            self.shift_press
+        )
+
+        self.root.bind(
+            "<KeyRelease-Shift_L>",
+            self.shift_release
+        )
+
+        self.root.bind(
+            "<KeyPress-Shift_R>",
+            self.shift_press
+        )
+
+        self.root.bind(
+            "<KeyRelease-Shift_R>",
+            self.shift_release
         )
 
         self.create_gui()
@@ -208,6 +238,16 @@ class MooringPlanner:
             self.on_scroll
         )
 
+        self.canvas.mpl_connect(
+            "button_release_event",
+            self.on_mouse_release
+        )
+
+        self.canvas.mpl_connect(
+            "motion_notify_event",
+            self.on_mouse_move
+        )
+
     def save_project(self):
 
         filename = filedialog.asksaveasfilename(
@@ -319,7 +359,7 @@ class MooringPlanner:
                     page = doc.load_page(0)
 
                     pix = page.get_pixmap(
-                        matrix=fitz.Matrix(2, 2)
+                        matrix=fitz.Matrix(1.5, 1.5)
                     )
 
                     arr = np.frombuffer(
@@ -599,6 +639,18 @@ class MooringPlanner:
     # =====================================================
 
     def on_click(self, event):
+
+        # Shift + Right Mouse
+        if event.button == 2:
+            self.panning = True
+
+            self.pan_start_x = event.xdata
+            self.pan_start_y = event.ydata
+
+            self.xlim_start = self.ax.get_xlim()
+            self.ylim_start = self.ax.get_ylim()
+
+            return
 
         toolbar = self.canvas.toolbar
 
@@ -1287,7 +1339,47 @@ class MooringPlanner:
 
             self.canvas.draw_idle()
 
-            
+    def shift_press(self, event):
+
+        self.shift_pressed = True
+
+    def shift_release(self, event):
+
+        self.shift_pressed = False
+
+    def on_mouse_move(self, event):
+
+        if not self.panning:
+            return
+
+        if event.xdata is None:
+            return
+
+        if event.ydata is None:
+            return
+
+        dx = event.xdata - self.pan_start_x
+        dy = event.ydata - self.pan_start_y
+
+        if abs(dx) < 3 and abs(dy) < 3:
+            return
+
+        self.ax.set_xlim(
+            self.xlim_start[0] - dx,
+            self.xlim_start[1] - dx
+        )
+
+        self.ax.set_ylim(
+            self.ylim_start[0] - dy,
+            self.ylim_start[1] - dy
+        )
+
+        self.canvas.draw_idle()
+
+    def on_mouse_release(self, event):
+
+        self.panning = False
+
 root = tk.Tk()
 
 app = MooringPlanner(root)
