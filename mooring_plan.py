@@ -34,6 +34,9 @@ class MooringPlanner:
         self.image_array = None
         self.background_file = None
 
+        self.home_xlim = None
+        self.home_ylim = None
+
         self.scale_points = []
         self.scale_factor = None
 
@@ -85,6 +88,12 @@ class MooringPlanner:
 
         top = tk.Frame(self.root)
         top.pack(fill=tk.X)
+
+        tk.Button(
+            top,
+            text="Home",
+            command=self.reset_view
+        ).pack(side=tk.LEFT)
 
         tk.Button(
             top,
@@ -445,6 +454,9 @@ class MooringPlanner:
 
         if self.image_array is not None:
             self.ax.imshow(self.image_array)
+            if self.home_xlim is None:
+                self.home_xlim = self.ax.get_xlim()
+                self.home_ylim = self.ax.get_ylim()
 
         # scale points
 
@@ -1250,6 +1262,15 @@ class MooringPlanner:
 
         self.canvas.draw_idle()
 
+    def reset_view(self):
+
+        if self.home_xlim is not None:
+            self.ax.set_xlim(self.home_xlim)
+            self.ax.set_ylim(self.home_ylim)
+
+            self.canvas.draw_idle()
+
+            
 root = tk.Tk()
 
 app = MooringPlanner(root)
