@@ -53,6 +53,28 @@ class MooringPlanner:
         self.pending_line_start = None
         self.pending_line_end = None
 
+        self.ctrl_pressed = False
+
+        self.root.bind(
+            "<KeyPress-Control_L>",
+            self.ctrl_press
+        )
+
+        self.root.bind(
+            "<KeyRelease-Control_L>",
+            self.ctrl_release
+        )
+
+        self.root.bind(
+            "<KeyPress-Control_R>",
+            self.ctrl_press
+        )
+
+        self.root.bind(
+            "<KeyRelease-Control_R>",
+            self.ctrl_release
+        )
+
         self.create_gui()
 
     # =====================================================
@@ -167,6 +189,11 @@ class MooringPlanner:
         self.canvas.mpl_connect(
             "button_press_event",
             self.on_click
+        )
+
+        self.canvas.mpl_connect(
+            "scroll_event",
+            self.on_scroll
         )
 
     def save_project(self):
@@ -400,6 +427,20 @@ class MooringPlanner:
 
     def redraw(self):
 
+        preserve_view = False
+
+        try:
+            xlim = self.ax.get_xlim()
+            ylim = self.ax.get_ylim()
+
+            preserve_view = (
+                    self.image_array is not None and
+                    len(self.ax.images) > 0
+            )
+
+        except:
+            preserve_view = False
+
         self.ax.clear()
 
         if self.image_array is not None:
@@ -521,7 +562,13 @@ class MooringPlanner:
 
         self.ax.set_title("Mooring Plan")
 
+        if preserve_view:
+            self.ax.set_xlim(xlim)
+            self.ax.set_ylim(ylim)
+
         self.canvas.draw()
+
+        # self.canvas.draw()
 
     # =====================================================
     # CLICK
@@ -1143,6 +1190,65 @@ class MooringPlanner:
             self.root.quit()
 
             self.root.destroy()
+
+    def ctrl_press(self, event):
+        self.ctrl_pressed = True
+
+    def ctrl_release(self, event):
+        self.ctrl_pressed = False
+
+    def on_scroll(self, event):
+
+        if not self.ctrl_pressed:
+            return
+
+        if event.xdata is None:
+            return
+
+        if event.ydata is None:
+            return
+
+        x = event.xdata
+        y = event.ydata
+
+        cur_xlim = self.ax.get_xlim()
+        cur_ylim = self.ax.get_ylim()
+
+        width = cur_xlim[1] - cur_xlim[0]
+        height = cur_ylim[1] - cur_ylim[0]
+
+        # Zoom amount
+
+        if event.button == "up":
+            scale = 0.8
+
+        elif event.button == "down":
+            scale = 1.25
+
+        else:
+            return
+
+        new_width = width * scale
+        new_height = height * scale
+
+        relx = (cur_xlim[1] - x) / width
+        rely = (cur_ylim[1] - y) / height
+
+        self.ax.set_xlim(
+            [
+                x - new_width * (1 - relx),
+                x + new_width * relx
+            ]
+        )
+
+        self.ax.set_ylim(
+            [
+                y - new_height * (1 - rely),
+                y + new_height * rely
+            ]
+        )
+
+        self.canvas.draw_idle()
 
 root = tk.Tk()
 
