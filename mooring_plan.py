@@ -18,151 +18,6 @@ import json
 
 class MooringPlanner:
 
-    def save_project(self):
-
-        filename = filedialog.asksaveasfilename(
-            defaultextension=".mpl",
-            filetypes=[("Mooring Project", "*.mpl")]
-        )
-
-        if not filename:
-            return
-
-        data = {
-            "background_file": self.background_file,
-            "scale_factor": self.scale_factor,
-            "origin": self.origin,
-            "barge_points": self.barge_points,
-            "quay_points": self.quay_points,
-            "lines": self.lines,
-            "barge_counter": self.barge_counter,
-            "quay_counter": self.quay_counter
-        }
-
-        with open(filename, "w") as f:
-            json.dump(data, f, indent=4)
-
-        messagebox.showinfo(
-            "Save",
-            "Project saved successfully."
-        )
-
-    def load_project(self):
-
-        filename = filedialog.askopenfilename(
-            filetypes=[
-                ("Mooring Project", "*.mpl")
-            ]
-        )
-
-        if not filename:
-            return
-
-        try:
-
-            with open(filename, "r") as f:
-                data = json.load(f)
-                self.background_file = data.get(
-                    "background_file"
-                )
-
-            self.load_background(self.background_file)
-
-            self.scale_factor = data.get("scale_factor")
-
-            origin = data.get("origin")
-
-            if origin is not None:
-                self.origin = tuple(origin)
-            else:
-                self.origin = None
-
-            self.barge_points = {
-                k: tuple(v)
-                for k, v in data.get("barge_points", {}).items()
-            }
-
-            self.quay_points = {
-                k: tuple(v)
-                for k, v in data.get("quay_points", {}).items()
-            }
-
-            self.lines = data.get("lines", [])
-
-            self.barge_counter = data.get(
-                "barge_counter",
-                len(self.barge_points) + 1
-            )
-
-            self.quay_counter = data.get(
-                "quay_counter",
-                len(self.quay_points) + 1
-            )
-
-            self.pending_line_start = None
-            self.pending_line_end = None
-
-            self.redraw()
-
-            messagebox.showinfo(
-                "Load Project",
-                "Project loaded successfully."
-            )
-
-        except Exception as e:
-
-            messagebox.showerror(
-                "Load Error",
-                f"Unable to load project:\n\n{e}"
-            )
-
-        if self.background_file:
-
-            try:
-
-                if self.background_file.lower().endswith(".pdf"):
-
-                    doc = fitz.open(
-                        self.background_file
-                    )
-
-                    page = doc.load_page(0)
-
-                    pix = page.get_pixmap(
-                        matrix=fitz.Matrix(2, 2)
-                    )
-
-                    arr = np.frombuffer(
-                        pix.samples,
-                        dtype=np.uint8
-                    )
-
-                    arr = arr.reshape(
-                        pix.height,
-                        pix.width,
-                        pix.n
-                    )
-
-                    self.image_array = arr
-
-                else:
-
-                    self.image_array = np.array(
-                        Image.open(
-                            self.background_file
-                        )
-                    )
-
-            except Exception as e:
-
-                messagebox.showwarning(
-                    "Drawing Missing",
-                    f"Project loaded.\n\n"
-                    f"The original drawing could not be found:\n\n"
-                    f"{self.background_file}\n\n"
-                    f"You can load it manually."
-                )
-
     def __init__(self, root):
 
         self.root = root
@@ -313,6 +168,152 @@ class MooringPlanner:
             "button_press_event",
             self.on_click
         )
+
+    def save_project(self):
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".mpl",
+            filetypes=[("Mooring Project", "*.mpl")]
+        )
+
+        if not filename:
+            return
+
+        data = {
+            "background_file": self.background_file,
+            "scale_factor": self.scale_factor,
+            "origin": self.origin,
+            "barge_points": self.barge_points,
+            "quay_points": self.quay_points,
+            "lines": self.lines,
+            "barge_counter": self.barge_counter,
+            "quay_counter": self.quay_counter
+        }
+
+        with open(filename, "w") as f:
+            json.dump(data, f, indent=4)
+
+        messagebox.showinfo(
+            "Save",
+            "Project saved successfully."
+        )
+
+    def load_project(self):
+
+        filename = filedialog.askopenfilename(
+            filetypes=[
+                ("Mooring Project", "*.mpl")
+            ]
+        )
+
+        if not filename:
+            return
+
+        try:
+
+            with open(filename, "r") as f:
+                data = json.load(f)
+                self.background_file = data.get(
+                    "background_file"
+                )
+
+            self.load_background(self.background_file)
+
+            self.scale_factor = data.get("scale_factor")
+
+            origin = data.get("origin")
+
+            if origin is not None:
+                self.origin = tuple(origin)
+            else:
+                self.origin = None
+
+            self.barge_points = {
+                k: tuple(v)
+                for k, v in data.get("barge_points", {}).items()
+            }
+
+            self.quay_points = {
+                k: tuple(v)
+                for k, v in data.get("quay_points", {}).items()
+            }
+
+            self.lines = data.get("lines", [])
+
+            self.barge_counter = data.get(
+                "barge_counter",
+                len(self.barge_points) + 1
+            )
+
+            self.quay_counter = data.get(
+                "quay_counter",
+                len(self.quay_points) + 1
+            )
+
+            self.pending_line_start = None
+            self.pending_line_end = None
+
+            self.redraw()
+
+            messagebox.showinfo(
+                "Load Project",
+                "Project loaded successfully."
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Load Error",
+                f"Unable to load project:\n\n{e}"
+            )
+
+        if self.background_file:
+
+            try:
+
+                if self.background_file.lower().endswith(".pdf"):
+
+                    doc = fitz.open(
+                        self.background_file
+                    )
+
+                    page = doc.load_page(0)
+
+                    pix = page.get_pixmap(
+                        matrix=fitz.Matrix(2, 2)
+                    )
+
+                    arr = np.frombuffer(
+                        pix.samples,
+                        dtype=np.uint8
+                    )
+
+                    arr = arr.reshape(
+                        pix.height,
+                        pix.width,
+                        pix.n
+                    )
+
+                    self.image_array = arr
+
+                else:
+
+                    self.image_array = np.array(
+                        Image.open(
+                            self.background_file
+                        )
+                    )
+
+            except Exception as e:
+
+                messagebox.showwarning(
+                    "Drawing Missing",
+                    f"Project loaded.\n\n"
+                    f"The original drawing could not be found:\n\n"
+                    f"{self.background_file}\n\n"
+                    f"You can load it manually."
+                )
+
 
     # =====================================================
     # MODE
