@@ -30,6 +30,9 @@ class MooringPlanner:
 
         self.mode = "none"
 
+        self.current_xlim = None
+        self.current_ylim = None
+
         self.image = None
         self.image_array = None
         self.background_file = None
@@ -450,6 +453,12 @@ class MooringPlanner:
         except:
             preserve_view = False
 
+        # Store current view if it exists
+
+        if len(self.ax.images) > 0:
+            self.current_xlim = self.ax.get_xlim()
+            self.current_ylim = self.ax.get_ylim()
+
         self.ax.clear()
 
         if self.image_array is not None:
@@ -578,9 +587,12 @@ class MooringPlanner:
             self.ax.set_xlim(xlim)
             self.ax.set_ylim(ylim)
 
+        if self.current_xlim is not None:
+            self.ax.set_xlim(self.current_xlim)
+            self.ax.set_ylim(self.current_ylim)
+
         self.canvas.draw()
 
-        # self.canvas.draw()
 
     # =====================================================
     # CLICK
@@ -588,12 +600,17 @@ class MooringPlanner:
 
     def on_click(self, event):
 
-        # Don't create points while using zoom/pan
-        if self.canvas.toolbar.mode:
-            self.status.config(
-            text = f"Navigation mode active: {self.canvas.toolbar.mode}"
-            )
-            return
+        toolbar = self.canvas.toolbar
+
+        # Only prevent drawing while panning
+        if toolbar is not None:
+
+            if toolbar.mode == "pan/zoom":
+                self.status.config(
+                    text="Pan mode active"
+                )
+
+                return
 
         if event.xdata is None or event.ydata is None:
             return
