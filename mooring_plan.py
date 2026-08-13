@@ -15,10 +15,18 @@ from PIL import Image
 
 import json
 
+from models import CoordinateSystem, CoordinateTransformer
+
 
 class MooringPlanner:
 
     def __init__(self, root):
+
+        self.axis_point = None
+
+        self.axis_preview = None
+
+        self.rotation_deg = 0.0
 
         self.root = root
         self.root.title("Mooring Plan Creator")
@@ -156,6 +164,12 @@ class MooringPlanner:
             top,
             text="Origin",
             command=lambda: self.set_mode("origin")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="X-Axis",
+            command=lambda: self.set_mode("axis")
         ).pack(side=tk.LEFT)
 
         tk.Button(
@@ -543,6 +557,105 @@ class MooringPlanner:
                 color="cyan"
             )
 
+        if (
+                self.origin is not None
+                and self.axis_point is not None
+        ):
+            ox, oy = self.origin
+            axp, ayp = self.axis_point
+
+            dx = axp - ox
+            dy = ayp - oy
+
+            axis_length = math.hypot(dx, dy)
+
+            ux = dx / axis_length
+            uy = dy / axis_length
+
+            vx = uy
+            vy = -ux
+
+            self.ax.plot(
+                [ox, ox + ux * axis_length],
+                [oy, oy + uy * axis_length],
+                color="cyan",
+                linewidth=2
+            )
+
+            self.ax.plot(
+                [ox, ox + vx * axis_length],
+                [oy, oy + vy * axis_length],
+                color="magenta",
+                linewidth=2
+            )
+
+            self.ax.text(
+                ox + ux * axis_length,
+                oy + uy * axis_length,
+                "X",
+                color="cyan"
+            )
+
+            self.ax.text(
+                ox + vx * axis_length,
+                oy + vy * axis_length,
+                "Y",
+                color="magenta"
+            )
+
+        if (
+                self.mode == "axis"
+                and self.origin is not None
+                and self.axis_preview is not None
+        ):
+            self.ax.plot(
+                [self.origin[0], self.axis_preview[0]],
+                [self.origin[1], self.axis_preview[1]],
+                "--",
+                color="cyan",
+                linewidth=2
+            )
+
+        if (
+                self.mode == "axis"
+                and self.origin is not None
+                and self.axis_preview is not None
+        ):
+            ox, oy = self.origin
+            px, py = self.axis_preview
+
+            # Rubber-band line
+            self.ax.plot(
+                [ox, px],
+                [oy, py],
+                "--",
+                color="cyan",
+                linewidth=2
+            )
+
+            # Angle relative to image X-axis
+            dx = px - ox
+            dy = oy - py
+
+            angle = math.degrees(
+                math.atan2(dy, dx)
+            )
+
+            # Angle label
+            self.ax.text(
+                px,
+                py,
+                f"{angle:.1f}°",
+                color="yellow",
+                fontsize=10,
+                bbox=dict(
+                    facecolor="black",
+                    alpha=0.7,
+                    edgecolor="none"
+                )
+            )
+
+
         # barge
 
         for name, p in self.barge_points.items():
@@ -693,6 +806,11 @@ class MooringPlanner:
         elif self.mode == "delete":
 
             self.delete_mode(x, y)
+
+        elif self.mode == "axis":
+
+            self.axis_mode(x, y)
+
     # =====================================================
     # SCALE
     # =====================================================
@@ -1002,12 +1120,19 @@ class MooringPlanner:
 
             for name, p in self.barge_points.items():
 
-                if self.scale_factor is None:
-                    x = p[0] - ox
-                    y = oy - p[1]
-                else:
-                    x = (p[0] - ox) * self.scale_factor
-                    y = (oy - p[1]) * self.scale_factor
+                cs = CoordinateSystem(
+                    origin_x=ox,
+                    origin_y=oy,
+                    scale=self.scale_factor,
+                    rotation_deg=self.rotation_deg
+                )
+
+                transformer = CoordinateTransformer(cs)
+
+                x, y = transformer.image_to_world(
+                    p[0],
+                    p[1]
+                )
 
                 writer.writerow(
                     [name, "Barge", x, y]
@@ -1015,12 +1140,21 @@ class MooringPlanner:
 
             for name, p in self.quay_points.items():
 
-                if self.scale_factor is None:
-                    x = p[0] - ox
-                    y = oy - p[1]
-                else:
-                    x = (p[0] - ox) * self.scale_factor
-                    y = (oy - p[1]) * self.scale_factor
+                cs = CoordinateSystem(
+                    origin_x=ox,
+                    origin_y=oy,
+                    scale=self.scale_factor
+                    if self.scale_factor is not None
+                    else 1.0,
+                    rotation_deg=self.rotation_deg
+                )
+
+                transformer = CoordinateTransformer(cs)
+
+                x, y = transformer.image_to_world(
+                    p[0],
+                    p[1]
+                )
 
                 writer.writerow(
                     [name, "Quay", x, y]
@@ -1349,6 +1483,23 @@ class MooringPlanner:
 
     def on_mouse_move(self, event):
 
+        if self.mode == "axis":
+
+            if self.origin is None:
+                return
+
+            if event.xdata is None or event.ydata is None:
+                return
+
+            self.axis_preview = (
+                event.xdata,
+                event.ydata
+            )
+
+            self.redraw()
+
+            return
+
         if not self.panning:
             return
 
@@ -1379,6 +1530,62 @@ class MooringPlanner:
     def on_mouse_release(self, event):
 
         self.panning = False
+
+    def axis_mode(self, x, y):
+
+        if self.origin is None:
+            messagebox.showerror(
+                "Error",
+                "Set origin first."
+            )
+
+            return
+
+        self.axis_point = (x, y)
+
+        dx = x - self.origin[0]
+
+        dy = self.origin[1] - y
+
+        self.rotation_deg = math.degrees(
+            math.atan2(dy, dx)
+        )
+
+        self.status.config(
+            text=f"Rotation = {self.rotation_deg:.1f}°"
+        )
+
+        self.axis_preview = None
+
+        self.mode = "none"
+
+        self.status.config(
+            text=f"Coordinate system defined ({self.rotation_deg:.1f}°)"
+        )
+
+        self.redraw()
+
+    # def axis_mode(self, x, y):
+    #
+    #     if self.origin is None:
+    #         messagebox.showerror(
+    #             "Error",
+    #             "Set origin first."
+    #         )
+    #         return
+    #
+    #     self.axis_point = (x, y)
+    #
+    #     dx = x - self.origin[0]
+    #     dy = self.origin[1] - y
+    #
+    #     self.rotation_deg = math.degrees(
+    #         math.atan2(dy, dx)
+    #     )
+    #
+    #     self.axis_preview = None
+    #
+    #     self.redraw()
 
 root = tk.Tk()
 
