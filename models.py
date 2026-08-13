@@ -15,7 +15,11 @@ class MooringProject:
 
     scale_factor: float | None = None
 
-    origin: Point | None = None
+    origin: tuple | None = None
+
+    axis_point: tuple | None = None
+
+    rotation_deg: float = 0.0
 
     barge_points: dict = field(default_factory=dict)
 
