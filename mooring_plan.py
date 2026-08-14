@@ -27,6 +27,7 @@ class MooringPlanner:
         # =====================================================
         self.project = MooringProject()
 
+
         # =====================================================
         # Application window
         # =====================================================
@@ -109,7 +110,9 @@ class MooringPlanner:
 
     def setup_bindings(self):
         """
-        keep track of Ctrl is currently being held down. Use in on_scroll for zooming using scroll mouse
+        Register keyboard events used by the application. Tracks the state of modifier keys such as Ctrl and Shift.
+        These flags are used by interactive features, for example Ctrl + mouse wheel zooming and future
+        keyboard-assisted editing operations.
         """
 
         self.root.bind(
@@ -130,6 +133,40 @@ class MooringPlanner:
         self.root.bind(
             "<KeyRelease-Control_R>",
             self.ctrl_release
+        )
+
+    def setup_canvas_events(self):
+        """
+        Register matplotlib canvas mouse events.
+
+        Handles:
+        - mouse clicks
+        - mouse wheel zooming
+        - mouse movement
+        - mouse button release
+
+        These events drive the interactive mooring-plan
+        editing functionality.
+        """
+
+        self.canvas.mpl_connect(
+            "button_press_event",
+            self.on_click
+        )
+
+        self.canvas.mpl_connect(
+            "scroll_event",
+            self.on_scroll
+        )
+
+        self.canvas.mpl_connect(
+            "button_release_event",
+            self.on_mouse_release
+        )
+
+        self.canvas.mpl_connect(
+            "motion_notify_event",
+            self.on_mouse_move
         )
 
     def create_gui(self):
@@ -251,25 +288,7 @@ class MooringPlanner:
 
         toolbar.update()
 
-        self.canvas.mpl_connect(
-            "button_press_event",
-            self.on_click
-        )
-
-        self.canvas.mpl_connect(
-            "scroll_event",
-            self.on_scroll
-        )
-
-        self.canvas.mpl_connect(
-            "button_release_event",
-            self.on_mouse_release
-        )
-
-        self.canvas.mpl_connect(
-            "motion_notify_event",
-            self.on_mouse_move
-        )
+        self.setup_canvas_events()
 
     def save_project(self):
 
