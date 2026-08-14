@@ -22,14 +22,14 @@ class MooringPlanner:
 
     def __init__(self, root):
 
+        # =====================================================
+        # Project data
+        # =====================================================
         self.project = MooringProject()
 
-        self.axis_point = None
-
-        self.axis_preview = None
-
-        self.rotation_deg = 0.0
-
+        # =====================================================
+        # Application window
+        # =====================================================
         self.root = root
         self.root.title("Mooring Plan Creator")
 
@@ -38,10 +38,24 @@ class MooringPlanner:
             self.on_close
         )
 
+
+        # =====================================================
+        # User Interaction state
+        # =====================================================
         self.mode = "none"
 
+        self.pending_line_start = None
+        self.pending_line_end = None
+
+        self.ctrl_pressed = False
         self.shift_pressed = False
 
+        self.axis_preview = None
+
+
+        # =====================================================
+        # Pan operation state
+        # =====================================================
         self.panning = False
 
         self.pan_start_x = None
@@ -50,36 +64,53 @@ class MooringPlanner:
         self.xlim_start = None
         self.ylim_start = None
 
+
+        # =====================================================
+        # View state
+        # =====================================================
         self.current_xlim = None
         self.current_ylim = None
-
-        self.image = None
-        self.image_array = None
-        self.project.background_file = None
 
         self.home_xlim = None
         self.home_ylim = None
 
+
+        # =====================================================
+        # Drawing/image state
+        # =====================================================
+        self.image = None
+        self.image_array = None
+
+
+        # =====================================================
+        # Scale Definition state
+        # =====================================================
         self.scale_points = []
-        self.project.scale_factor = None
 
-        self.project.origin = None
 
-        self.project.barge_points = {}
-        self.project.quay_points = {}
-
-        self.project.barge_counter = 1
-        self.project.quay_counter = 1
-
-        self.project.lines = []
-
+        # =====================================================
+        # Undo/redo state
+        # =====================================================
         self.undo_stack = []
         self.redo_stack = []
 
-        self.pending_line_start = None
-        self.pending_line_end = None
 
-        self.ctrl_pressed = False
+        # =====================================================
+        # Keyboard bindings
+        # =====================================================
+        self.setup_bindings()
+
+
+        # =====================================================
+        # Create GUI
+        # =====================================================
+        self.create_gui()
+
+
+    def setup_bindings(self):
+        """
+        keep track of Ctrl is currently being held down. Use in on_scroll for zooming using scroll mouse
+        """
 
         self.root.bind(
             "<KeyPress-Control_L>",
@@ -100,32 +131,6 @@ class MooringPlanner:
             "<KeyRelease-Control_R>",
             self.ctrl_release
         )
-
-        self.root.bind(
-            "<KeyPress-Shift_L>",
-            self.shift_press
-        )
-
-        self.root.bind(
-            "<KeyRelease-Shift_L>",
-            self.shift_release
-        )
-
-        self.root.bind(
-            "<KeyPress-Shift_R>",
-            self.shift_press
-        )
-
-        self.root.bind(
-            "<KeyRelease-Shift_R>",
-            self.shift_release
-        )
-
-        self.create_gui()
-
-    # =====================================================
-    # GUI
-    # =====================================================
 
     def create_gui(self):
 
@@ -533,7 +538,7 @@ class MooringPlanner:
         # origin/coordinate system
         self.renderer.draw_coordinate_system(
             self.project.origin,
-            self.axis_point,
+            self.project.axis_point,
             self.axis_preview,
             self.mode
         )
@@ -1296,14 +1301,6 @@ class MooringPlanner:
 
             self.canvas.draw_idle()
 
-    def shift_press(self, event):
-
-        self.shift_pressed = True
-
-    def shift_release(self, event):
-
-        self.shift_pressed = False
-
     def on_mouse_move(self, event):
 
         if self.mode == "axis":
@@ -1364,7 +1361,7 @@ class MooringPlanner:
 
             return
 
-        self.axis_point = (x, y)
+        self.project.axis_point = (x, y)
 
         dx = x - self.project.origin[0]
 
