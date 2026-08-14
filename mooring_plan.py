@@ -55,7 +55,7 @@ class MooringPlanner:
 
         self.image = None
         self.image_array = None
-        self.background_file = None
+        self.project.background_file = None
 
         self.home_xlim = None
         self.home_ylim = None
@@ -65,13 +65,13 @@ class MooringPlanner:
 
         self.project.origin = None
 
-        self.barge_points = {}
-        self.quay_points = {}
+        self.project.barge_points = {}
+        self.project.quay_points = {}
 
-        self.barge_counter = 1
-        self.quay_counter = 1
+        self.project.barge_counter = 1
+        self.project.quay_counter = 1
 
-        self.lines = []
+        self.project.lines = []
 
         self.undo_stack = []
         self.redo_stack = []
@@ -277,14 +277,14 @@ class MooringPlanner:
             return
 
         data = {
-            "background_file": self.background_file,
+            "background_file": self.project.background_file,
             "scale_factor": self.project.scale_factor,
             "origin": self.project.origin,
-            "barge_points": self.barge_points,
-            "quay_points": self.quay_points,
-            "lines": self.lines,
-            "barge_counter": self.barge_counter,
-            "quay_counter": self.quay_counter
+            "barge_points": self.project.barge_points,
+            "quay_points": self.project.quay_points,
+            "lines": self.project.lines,
+            "barge_counter": self.project.barge_counter,
+            "quay_counter": self.project.quay_counter
         }
 
         with open(filename, "w") as f:
@@ -310,11 +310,11 @@ class MooringPlanner:
 
             with open(filename, "r") as f:
                 data = json.load(f)
-                self.background_file = data.get(
+                self.project.background_file = data.get(
                     "background_file"
                 )
 
-            self.load_background(self.background_file)
+            self.load_background(self.project.background_file)
 
             self.project.scale_factor = data.get("scale_factor")
 
@@ -325,26 +325,26 @@ class MooringPlanner:
             else:
                 self.project.origin = None
 
-            self.barge_points = {
+            self.project.barge_points = {
                 k: tuple(v)
                 for k, v in data.get("barge_points", {}).items()
             }
 
-            self.quay_points = {
+            self.project.quay_points = {
                 k: tuple(v)
                 for k, v in data.get("quay_points", {}).items()
             }
 
-            self.lines = data.get("lines", [])
+            self.project.lines = data.get("lines", [])
 
-            self.barge_counter = data.get(
+            self.project.barge_counter = data.get(
                 "barge_counter",
-                len(self.barge_points) + 1
+                len(self.project.barge_points) + 1
             )
 
-            self.quay_counter = data.get(
+            self.project.quay_counter = data.get(
                 "quay_counter",
-                len(self.quay_points) + 1
+                len(self.project.quay_points) + 1
             )
 
             self.pending_line_start = None
@@ -364,14 +364,14 @@ class MooringPlanner:
                 f"Unable to load project:\n\n{e}"
             )
 
-        if self.background_file:
+        if self.project.background_file:
 
             try:
 
-                if self.background_file.lower().endswith(".pdf"):
+                if self.project.background_file.lower().endswith(".pdf"):
 
                     doc = fitz.open(
-                        self.background_file
+                        self.project.background_file
                     )
 
                     page = doc.load_page(0)
@@ -397,7 +397,7 @@ class MooringPlanner:
 
                     self.image_array = np.array(
                         Image.open(
-                            self.background_file
+                            self.project.background_file
                         )
                     )
 
@@ -407,7 +407,7 @@ class MooringPlanner:
                     "Drawing Missing",
                     f"Project loaded.\n\n"
                     f"The original drawing could not be found:\n\n"
-                    f"{self.background_file}\n\n"
+                    f"{self.project.background_file}\n\n"
                     f"You can load it manually."
                 )
 
@@ -461,7 +461,7 @@ class MooringPlanner:
 
         self.load_background(file)
 
-        self.background_file = file
+        self.project.background_file = file
 
         if file.lower().endswith(".pdf"):
 
@@ -540,21 +540,21 @@ class MooringPlanner:
 
         # barge
         self.renderer.draw_barge_bollards(
-            self.barge_points,
+            self.project.barge_points,
             self.pending_line_start
         )
 
         # quay
         self.renderer.draw_quay_bollards(
-            self.quay_points,
+            self.project.quay_points,
             self.pending_line_end
         )
 
         # lines
         self.renderer.draw_mooring_lines(
-            self.lines,
-            self.barge_points,
-            self.quay_points
+            self.project.lines,
+            self.project.barge_points,
+            self.project.quay_points
         )
 
         self.ax.set_title("Mooring Plan")
@@ -683,11 +683,11 @@ class MooringPlanner:
 
     def barge_mode(self, x, y):
 
-        name = f"B{self.barge_counter}"
+        name = f"B{self.project.barge_counter}"
 
-        self.barge_points[name] = (x, y)
+        self.project.barge_points[name] = (x, y)
 
-        self.barge_counter += 1
+        self.project.barge_counter += 1
 
         self.undo_stack.append(
             ("barge", name)
@@ -701,11 +701,11 @@ class MooringPlanner:
 
     def quay_mode(self, x, y):
 
-        name = f"Q{self.quay_counter}"
+        name = f"Q{self.project.quay_counter}"
 
-        self.quay_points[name] = (x, y)
+        self.project.quay_points[name] = (x, y)
 
-        self.quay_counter += 1
+        self.project.quay_counter += 1
 
         self.undo_stack.append(
             ("quay", name)
@@ -722,7 +722,7 @@ class MooringPlanner:
         best = None
         dist = 20
 
-        for name, p in self.barge_points.items():
+        for name, p in self.project.barge_points.items():
 
             d = math.dist(
                 (x, y),
@@ -740,7 +740,7 @@ class MooringPlanner:
         best = None
         dist = 20
 
-        for name, p in self.quay_points.items():
+        for name, p in self.project.quay_points.items():
 
             d = math.dist(
                 (x, y),
@@ -797,7 +797,7 @@ class MooringPlanner:
             "to": q
         }
 
-        self.lines.append(item)
+        self.project.lines.append(item)
 
         self.undo_stack.append(
             ("line", item)
@@ -824,13 +824,13 @@ class MooringPlanner:
         kind = action[0]
 
         if kind == "barge":
-            del self.barge_points[action[1]]
+            del self.project.barge_points[action[1]]
 
         elif kind == "quay":
-            del self.quay_points[action[1]]
+            del self.project.quay_points[action[1]]
 
         elif kind == "line":
-            self.lines.remove(action[1])
+            self.project.lines.remove(action[1])
 
         elif kind == "origin":
             self.project.origin = None
@@ -840,18 +840,18 @@ class MooringPlanner:
             name = action[1]["name"]
             point = action[1]["point"]
 
-            self.barge_points[name] = point
+            self.project.barge_points[name] = point
 
         elif kind == "delete_quay":
 
             name = action[1]["name"]
             point = action[1]["point"]
 
-            self.quay_points[name] = point
+            self.project.quay_points[name] = point
 
         elif kind == "delete_line":
 
-            self.lines.append(action[1])
+            self.project.lines.append(action[1])
 
         self.redraw()
 
@@ -872,26 +872,26 @@ class MooringPlanner:
 
         if kind == "line":
 
-            self.lines.append(action[1])
+            self.project.lines.append(action[1])
 
         elif kind == "delete_barge":
 
             name = action[1]["name"]
 
-            if name in self.barge_points:
-                del self.barge_points[name]
+            if name in self.project.barge_points:
+                del self.project.barge_points[name]
 
         elif kind == "delete_quay":
 
             name = action[1]["name"]
 
-            if name in self.quay_points:
-                del self.quay_points[name]
+            if name in self.project.quay_points:
+                del self.project.quay_points[name]
 
         elif kind == "delete_line":
 
-            if action[1] in self.lines:
-                self.lines.remove(action[1])
+            if action[1] in self.project.lines:
+                self.project.lines.remove(action[1])
 
         self.redraw()
 
@@ -941,7 +941,7 @@ class MooringPlanner:
 
             ox, oy = self.project.origin
 
-            for name, p in self.barge_points.items():
+            for name, p in self.project.barge_points.items():
 
                 cs = CoordinateSystem(
                     origin_x=ox,
@@ -961,7 +961,7 @@ class MooringPlanner:
                     [name, "Barge", x, y]
                 )
 
-            for name, p in self.quay_points.items():
+            for name, p in self.project.quay_points.items():
 
                 cs = CoordinateSystem(
                     origin_x=ox,
@@ -1003,10 +1003,10 @@ class MooringPlanner:
                 ]
             )
 
-            for line in self.lines:
+            for line in self.project.lines:
 
-                p1 = self.barge_points[line["from"]]
-                p2 = self.quay_points[line["to"]]
+                p1 = self.project.barge_points[line["from"]]
+                p2 = self.project.quay_points[line["to"]]
 
                 if self.project.scale_factor is not None:
                     length = (
@@ -1048,7 +1048,7 @@ class MooringPlanner:
 
     def load_background(self, filename):
 
-        self.background_file = filename
+        self.project.background_file = filename
 
         if filename.lower().endswith(".pdf"):
 
@@ -1098,7 +1098,7 @@ class MooringPlanner:
                     ("delete_line", line.copy())
                 )
 
-                self.lines.remove(line)
+                self.project.lines.remove(line)
 
                 self.redraw()
 
@@ -1116,21 +1116,21 @@ class MooringPlanner:
 
             if answer:
                 # Remove connected lines
-                self.lines = [
-                    l for l in self.lines
+                self.project.lines = [
+                    l for l in self.project.lines
                     if l["from"] != b
                 ]
 
                 deleted_data = {
                     "name": b,
-                    "point": self.barge_points[b]
+                    "point": self.project.barge_points[b]
                 }
 
                 self.undo_stack.append(
                     ("delete_barge", deleted_data)
                 )
 
-                del self.barge_points[b]
+                del self.project.barge_points[b]
 
                 self.redraw()
 
@@ -1147,21 +1147,21 @@ class MooringPlanner:
             )
 
             if answer:
-                self.lines = [
-                    l for l in self.lines
+                self.project.lines = [
+                    l for l in self.project.lines
                     if l["to"] != q
                 ]
 
                 deleted_data = {
                     "name": q,
-                    "point": self.quay_points[q]
+                    "point": self.project.quay_points[q]
                 }
 
                 self.undo_stack.append(
                     ("delete_quay", deleted_data)
                 )
 
-                del self.quay_points[q]
+                del self.project.quay_points[q]
 
                 self.redraw()
 
@@ -1169,10 +1169,10 @@ class MooringPlanner:
 
         threshold = 10
 
-        for line in self.lines:
+        for line in self.project.lines:
 
-            p1 = self.barge_points[line["from"]]
-            p2 = self.quay_points[line["to"]]
+            p1 = self.project.barge_points[line["from"]]
+            p2 = self.project.quay_points[line["to"]]
 
             distance = self.point_to_segment_distance(
                 x, y,
