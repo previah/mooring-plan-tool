@@ -308,7 +308,9 @@ class MooringPlanner:
             "quay_points": self.project.quay_points,
             "lines": self.project.lines,
             "barge_counter": self.project.barge_counter,
-            "quay_counter": self.project.quay_counter
+            "quay_counter": self.project.quay_counter,
+            "axis_point": self.project.axis_point,
+            "rotation_deg": self.project.rotation_deg
         }
 
         with open(filename, "w") as f:
@@ -369,6 +371,13 @@ class MooringPlanner:
             self.project.quay_counter = data.get(
                 "quay_counter",
                 len(self.project.quay_points) + 1
+            )
+
+            self.project.axis_point = data.get("axis_point")
+
+            self.project.rotation_deg = data.get(
+                "rotation_deg",
+                0.0
             )
 
             self.pending_line_start = None
@@ -965,16 +974,18 @@ class MooringPlanner:
 
             ox, oy = self.project.origin
 
+            cs = CoordinateSystem(
+                origin_x=ox,
+                origin_y=oy,
+                scale=self.project.scale_factor
+                if self.project.scale_factor is not None
+                else 1.0,
+                rotation_deg=self.project.rotation_deg
+            )
+
+            transformer = CoordinateTransformer(cs)
+
             for name, p in self.project.barge_points.items():
-
-                cs = CoordinateSystem(
-                    origin_x=ox,
-                    origin_y=oy,
-                    scale=self.project.scale_factor,
-                    rotation_deg=self.project.rotation_deg
-                )
-
-                transformer = CoordinateTransformer(cs)
 
                 x, y = transformer.image_to_world(
                     p[0],
@@ -986,17 +997,6 @@ class MooringPlanner:
                 )
 
             for name, p in self.project.quay_points.items():
-
-                cs = CoordinateSystem(
-                    origin_x=ox,
-                    origin_y=oy,
-                    scale=self.project.scale_factor
-                    if self.project.scale_factor is not None
-                    else 1.0,
-                    rotation_deg=self.project.rotation_deg
-                )
-
-                transformer = CoordinateTransformer(cs)
 
                 x, y = transformer.image_to_world(
                     p[0],
