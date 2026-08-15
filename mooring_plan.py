@@ -79,7 +79,6 @@ class MooringPlanner:
         # =====================================================
         # Drawing/image state
         # =====================================================
-        self.image = None
         self.image_array = None
 
 
