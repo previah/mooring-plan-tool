@@ -170,6 +170,10 @@ class MooringPlanner:
         )
 
     def create_gui(self):
+        """
+        Create the application user interface, including tool buttons, status bar, plotting canvas, and matplotlib
+        navigation toolbar.
+        """
 
         top = tk.Frame(self.root)
         top.pack(fill=tk.X)
@@ -291,6 +295,10 @@ class MooringPlanner:
         self.setup_canvas_events()
 
     def save_project(self):
+        """
+        Save the current mooring project to a project file, including drawing references, coordinate-system settings,
+        bollards, and mooring lines.
+        """
 
         filename = filedialog.asksaveasfilename(
             defaultextension=".mpl",
@@ -322,6 +330,9 @@ class MooringPlanner:
         )
 
     def load_project(self):
+        """
+        Load a previously saved mooring project and restore its data and drawing state.
+        """
 
         filename = filedialog.askopenfilename(
             filetypes=[
@@ -450,6 +461,9 @@ class MooringPlanner:
     # =====================================================
 
     def set_mode(self, mode):
+        """
+        Activate the selected editing mode and disable active matplotlib pan or zoom tools if necessary.
+        """
 
         try:
 
@@ -479,6 +493,9 @@ class MooringPlanner:
     # =====================================================
 
     def load_file(self):
+        """
+        Load a drawing file to be used as the mooring-plan background image.
+        """
 
         file = filedialog.askopenfilename(
             filetypes=[
@@ -529,6 +546,9 @@ class MooringPlanner:
     # =====================================================
 
     def redraw(self):
+        """
+        Redraw the complete mooring plan while preserving the current view where possible.
+        """
 
         preserve_view = False
 
@@ -608,6 +628,9 @@ class MooringPlanner:
     # =====================================================
 
     def on_click(self, event):
+        """
+        Handle mouse-click events and dispatch them to the active editing mode.
+        """
 
         # Shift + Right Mouse
         if event.button == 2:
@@ -672,6 +695,9 @@ class MooringPlanner:
     # =====================================================
 
     def scale_mode(self, x, y):
+        """
+        Define the drawing scale using two user-selected reference points.
+        """
 
         self.scale_points.append((x, y))
 
@@ -701,6 +727,9 @@ class MooringPlanner:
     # =====================================================
 
     def origin_mode(self, x, y):
+        """
+        Set the coordinate-system origin.
+        """
 
         self.project.origin = (x, y)
 
@@ -715,6 +744,9 @@ class MooringPlanner:
     # =====================================================
 
     def barge_mode(self, x, y):
+        """
+        Create a new barge bollard at the selected location.
+        """
 
         name = f"B{self.project.barge_counter}"
 
@@ -733,6 +765,9 @@ class MooringPlanner:
     # =====================================================
 
     def quay_mode(self, x, y):
+        """
+        Create a new quay bollard at the selected location.
+        """
 
         name = f"Q{self.project.quay_counter}"
 
@@ -751,6 +786,9 @@ class MooringPlanner:
     # =====================================================
 
     def nearest_barge(self, x, y):
+        """
+        Return the nearest barge bollard within the selection tolerance.
+        """
 
         best = None
         dist = 20
@@ -769,6 +807,9 @@ class MooringPlanner:
         return best
 
     def nearest_quay(self, x, y):
+        """
+        Return the nearest quay bollard within the selection tolerance.
+        """
 
         best = None
         dist = 20
@@ -791,6 +832,9 @@ class MooringPlanner:
     # =====================================================
 
     def line_mode(self, x, y):
+        """
+        Create a mooring line by selecting a barge bollard and a quay bollard.
+        """
 
         if self.pending_line_start is None:
 
@@ -846,6 +890,9 @@ class MooringPlanner:
     # =====================================================
 
     def undo(self):
+        """
+        Reverse the most recent editing action.
+        """
 
         if not self.undo_stack:
             return
@@ -893,6 +940,9 @@ class MooringPlanner:
     # =====================================================
 
     def redo(self):
+        """
+        Reapply the most recently undone action.
+        """
 
         if not self.redo_stack:
             return
@@ -933,6 +983,9 @@ class MooringPlanner:
     # =====================================================
 
     def export_data(self):
+        """
+        Export bollard coordinates, mooring-line data, and a plan image using the defined coordinate system.
+        """
 
         if self.project.origin is None:
             messagebox.showerror(
@@ -1071,6 +1124,9 @@ class MooringPlanner:
         )
 
     def load_background(self, filename):
+        """
+        Load a drawing file into memory for display as the plan background.
+        """
 
         self.project.background_file = filename
 
@@ -1106,6 +1162,9 @@ class MooringPlanner:
             )
 
     def delete_mode(self, x, y):
+        """
+        Delete the selected mooring line or bollard.
+        """
 
         # Try line first
         line = self.nearest_line(x, y)
@@ -1190,6 +1249,9 @@ class MooringPlanner:
                 self.redraw()
 
     def nearest_line(self, x, y):
+        """
+        Return the nearest mooring line within the selection tolerance.
+        """
 
         threshold = 10
 
@@ -1214,6 +1276,9 @@ class MooringPlanner:
             px, py,
             x1, y1,
             x2, y2):
+        """
+        Calculate the shortest distance between a point and a line segment.
+        """
 
         dx = x2 - x1
         dy = y2 - y1
@@ -1240,6 +1305,9 @@ class MooringPlanner:
         )
 
     def on_close(self):
+        """
+        Confirm and close the application.
+        """
 
         answer = messagebox.askyesno(
             "Exit",
@@ -1254,12 +1322,21 @@ class MooringPlanner:
             self.root.destroy()
 
     def ctrl_press(self, event):
+        """
+        Record that the Ctrl key is currently pressed.
+        """
         self.ctrl_pressed = True
 
     def ctrl_release(self, event):
+        """
+        Record that the Ctrl key has been released.
+        """
         self.ctrl_pressed = False
 
     def on_scroll(self, event):
+        """
+        Perform cursor-centred zooming when Ctrl and the mouse wheel are used together.
+        """
 
         if not self.ctrl_pressed:
             return
@@ -1313,6 +1390,9 @@ class MooringPlanner:
         self.canvas.draw_idle()
 
     def reset_view(self):
+        """
+        Restore the original view of the loaded drawing.
+        """
 
         if self.home_xlim is not None:
             self.ax.set_xlim(self.home_xlim)
@@ -1321,6 +1401,9 @@ class MooringPlanner:
             self.canvas.draw_idle()
 
     def on_mouse_move(self, event):
+        """
+        Handle mouse-movement events for interactive previews and panning operations.
+        """
 
         if self.mode == "axis":
 
@@ -1367,10 +1450,16 @@ class MooringPlanner:
         self.canvas.draw_idle()
 
     def on_mouse_release(self, event):
+        """
+        Complete any active panning operation.
+        """
 
         self.panning = False
 
     def axis_mode(self, x, y):
+        """
+        Define the positive X-axis direction and calculate the coordinate-system rotation.
+        """
 
         if self.project.origin is None:
             messagebox.showerror(
