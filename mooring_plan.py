@@ -587,7 +587,8 @@ class MooringPlanner:
             self.project.origin,
             self.project.axis_point,
             self.axis_preview,
-            self.mode
+            self.mode,
+            self.project.rotation_deg
         )
 
         # barge

@@ -46,7 +46,6 @@ class CoordinateTransformer:
         self.cs = coordinate_system
 
     def image_to_world(self, x, y):
-
         dx = x - self.cs.origin_x
         dy = self.cs.origin_y - y
 
@@ -58,13 +57,13 @@ class CoordinateTransformer:
         )
 
         world_x = (
-            dx * math.cos(angle)
-            - dy * math.sin(angle)
+                dx * math.cos(angle)
+                + dy * math.sin(angle)
         )
 
         world_y = (
-            dx * math.sin(angle)
-            + dy * math.cos(angle)
+                -dx * math.sin(angle)
+                + dy * math.cos(angle)
         )
 
         return world_x, world_y

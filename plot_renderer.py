@@ -123,7 +123,8 @@ class PlotRenderer:
             origin,
             axis_point,
             axis_preview,
-            mode
+            mode,
+            rotation_deg
     ):
         if origin is not None:
             self.ax.plot(
@@ -148,13 +149,18 @@ class PlotRenderer:
             ox, oy = origin
             axp, ayp = axis_point
 
-            dx = axp - ox
-            dy = ayp - oy
+            axis_length = math.hypot(
+                axp - ox,
+                ayp - oy
+            )
 
-            axis_length = math.hypot(dx, dy)
+            angle_rad = math.radians(
+                rotation_deg
+            )
 
-            ux = dx / axis_length
-            uy = dy / axis_length
+            ux = math.cos(angle_rad)
+
+            uy = -math.sin(angle_rad)
 
             vx = uy
             vy = -ux
