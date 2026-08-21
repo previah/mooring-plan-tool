@@ -266,6 +266,12 @@ class MooringPlanner:
             text="Ready"
         )
 
+        tk.Button(
+            top,
+            text="Renumber",
+            command=self.renumber_bollards
+        ).pack(side=tk.LEFT)
+
         self.status.pack(fill=tk.X)
 
         self.fig, self.ax = plt.subplots(figsize=(10, 8))
@@ -1489,6 +1495,61 @@ class MooringPlanner:
 
         self.status.config(
             text=f"Coordinate system defined ({self.project.rotation_deg:.1f}°)"
+        )
+
+        self.redraw()
+
+    def renumber_bollards(self):
+
+        new_barge_points = {}
+
+        mapping = {}
+
+        for i, old_name in enumerate(
+                sorted(self.project.barge_points.keys()),
+                start=1):
+            new_name = f"B{i}"
+
+            mapping[old_name] = new_name
+
+            new_barge_points[new_name] = (
+                self.project.barge_points[old_name]
+            )
+
+        self.project.barge_points = new_barge_points
+
+        new_quay_points = {}
+
+        quay_mapping = {}
+
+        for i, old_name in enumerate(
+                sorted(self.project.quay_points.keys()),
+                start=1):
+            new_name = f"Q{i}"
+
+            quay_mapping[old_name] = new_name
+
+            new_quay_points[new_name] = (
+                self.project.quay_points[old_name]
+            )
+
+        self.project.quay_points = new_quay_points
+
+        for line in self.project.lines:
+            line["from"] = mapping[
+                line["from"]
+            ]
+
+            line["to"] = quay_mapping[
+                line["to"]
+            ]
+
+        self.project.barge_counter = (
+                len(self.project.barge_points) + 1
+        )
+
+        self.project.quay_counter = (
+                len(self.project.quay_points) + 1
         )
 
         self.redraw()
