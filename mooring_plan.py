@@ -257,20 +257,39 @@ class MooringPlanner:
 
         tk.Button(
             top,
-            text="Export",
-            command=self.export_data
+            text="Clear Lines",
+            command=self.clear_lines
         ).pack(side=tk.LEFT)
 
-        self.status = tk.Label(
-            self.root,
-            text="Ready"
-        )
+        tk.Button(
+            top,
+            text="Clear Barge",
+            command=self.clear_barge_bollards
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Clear Quay",
+            command=self.clear_quay_bollards
+        ).pack(side=tk.LEFT)
 
         tk.Button(
             top,
             text="Renumber",
             command=self.renumber_bollards
         ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Export",
+            command=self.export_data
+        ).pack(side=tk.LEFT)
+
+
+        self.status = tk.Label(
+            self.root,
+            text="Ready"
+        )
 
         self.status.pack(fill=tk.X)
 
@@ -1551,6 +1570,67 @@ class MooringPlanner:
         self.project.quay_counter = (
                 len(self.project.quay_points) + 1
         )
+
+        self.redraw()
+
+    def clear_lines(self):
+        """
+        Delete all mooring lines.
+        """
+
+        answer = messagebox.askyesno(
+            "Delete Lines",
+            "Delete all mooring lines?"
+        )
+
+        if not answer:
+            return
+
+        self.project.lines.clear()
+
+        self.redraw()
+
+    def clear_barge_bollards(self):
+        """
+        Delete all barge bollards and their
+        connected mooring lines.
+        """
+
+        answer = messagebox.askyesno(
+            "Delete Barge Bollards",
+            "Delete all barge bollards?"
+        )
+
+        if not answer:
+            return
+
+        self.project.barge_points.clear()
+
+        self.project.lines.clear()
+
+        self.project.barge_counter = 1
+
+        self.redraw()
+
+    def clear_quay_bollards(self):
+        """
+        Delete all quay bollards and their
+        connected mooring lines.
+        """
+
+        answer = messagebox.askyesno(
+            "Delete Quay Bollards",
+            "Delete all quay bollards?"
+        )
+
+        if not answer:
+            return
+
+        self.project.quay_points.clear()
+
+        self.project.lines.clear()
+
+        self.project.quay_counter = 1
 
         self.redraw()
 
