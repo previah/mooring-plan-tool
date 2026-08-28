@@ -445,7 +445,7 @@ class MooringPlanner:
                     page = doc.load_page(0)
 
                     pix = page.get_pixmap(
-                        matrix=fitz.Matrix(1.5, 1.5)
+                        matrix=fitz.Matrix(6.0, 6.0)
                     )
 
                     arr = np.frombuffer(
@@ -542,7 +542,7 @@ class MooringPlanner:
             doc = fitz.open(file)
             page = doc.load_page(0)
 
-            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+            pix = page.get_pixmap(matrix=fitz.Matrix(6.0, 6.0))
 
             arr = np.frombuffer(
                 pix.samples,
@@ -1161,7 +1161,7 @@ class MooringPlanner:
             page = doc.load_page(0)
 
             pix = page.get_pixmap(
-                matrix=fitz.Matrix(1.5, 1.5)
+                matrix=fitz.Matrix(6.0, 6.0)
             )
 
             arr = np.frombuffer(
