@@ -18,6 +18,26 @@ import json
 from models import CoordinateSystem, CoordinateTransformer, MooringProject
 from plot_renderer import PlotRenderer
 
+import yaml
+
+
+class FlowStyleList(list):
+    pass
+
+
+def flow_style_list_representer(dumper, data):
+    return dumper.represent_sequence(
+        "tag:yaml.org,2002:seq",
+        data,
+        flow_style=True
+    )
+
+
+yaml.add_representer(
+    FlowStyleList,
+    flow_style_list_representer
+)
+
 class MooringPlanner:
 
     def __init__(self, root):
@@ -285,6 +305,11 @@ class MooringPlanner:
             command=self.export_data
         ).pack(side=tk.LEFT)
 
+        tk.Button(
+            top,
+            text="Export YAML",
+            command=self.export_yaml
+        ).pack(side=tk.LEFT)
 
         self.status = tk.Label(
             self.root,
@@ -1633,6 +1658,100 @@ class MooringPlanner:
         self.project.quay_counter = 1
 
         self.redraw()
+
+    def export_yaml(self):
+
+        if self.project.origin is None:
+            messagebox.showerror(
+                "Error",
+                "Origin not set."
+            )
+            return
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".yaml",
+            filetypes=[("YAML", "*.yaml")]
+        )
+
+        if not filename:
+            return
+
+        ox, oy = self.project.origin
+
+        cs = CoordinateSystem(
+            origin_x=ox,
+            origin_y=oy,
+            scale=self.project.scale_factor
+            if self.project.scale_factor is not None
+            else 1.0,
+            rotation_deg=self.project.rotation_deg
+        )
+
+        transformer = CoordinateTransformer(cs)
+
+        data = {
+            "Poi": {},
+            "Cable": {}
+        }
+
+        for name, p in self.project.barge_points.items():
+            x, y = transformer.image_to_world(
+                p[0],
+                p[1]
+            )
+
+            data["Poi"][name] = {
+                "parent": "Barge",
+                "position": FlowStyleList([
+                    round(x, 3),
+                    round(y, 3),
+                    0.0
+                ])
+            }
+
+        for name, p in self.project.quay_points.items():
+            x, y = transformer.image_to_world(
+                p[0],
+                p[1]
+            )
+
+            data["Poi"][name] = {
+                "parent": "Quay",
+                "position": FlowStyleList([
+                    round(x, 3),
+                    round(y, 3),
+                    0.0
+                ])
+            }
+
+        for line in self.project.lines:
+            data["Cable"][line["name"]] = {
+                "poiA": line["from"],
+                "poiB": line["to"],
+                "EA": ""
+            }
+
+        with open(
+                filename,
+                "w",
+                encoding="utf-8"
+        ) as f:
+
+            yaml.dump(
+                data,
+                f,
+                sort_keys=False,
+                default_flow_style=False
+            )
+
+        messagebox.showinfo(
+            "Export",
+            "YAML file exported successfully."
+        )
+
+
+
+
 
 
 root = tk.Tk()
