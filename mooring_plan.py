@@ -126,6 +126,11 @@ class MooringPlanner:
         # =====================================================
         self.create_gui()
 
+        # =====================================================
+        # Drag state
+        # =====================================================
+        self.dragging_point = None
+        self.dragging_type = None
 
     def setup_bindings(self):
         """
@@ -249,6 +254,12 @@ class MooringPlanner:
             top,
             text="Quay Bollard",
             command=lambda: self.set_mode("quay")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
+            text="Move",
+            command=lambda: self.set_mode("move")
         ).pack(side=tk.LEFT)
 
         tk.Button(
@@ -739,6 +750,10 @@ class MooringPlanner:
         elif self.mode == "axis":
 
             self.axis_mode(x, y)
+
+        elif self.mode == "move":
+
+            self.start_move(x, y)
 
     # =====================================================
     # SCALE
@@ -1472,6 +1487,36 @@ class MooringPlanner:
 
             return
 
+        if self.dragging_point is not None:
+
+            if event.xdata is None:
+                return
+
+            if event.ydata is None:
+                return
+
+            if self.dragging_type == "barge":
+
+                self.project.barge_points[
+                    self.dragging_point
+                ] = (
+                    event.xdata,
+                    event.ydata
+                )
+
+            elif self.dragging_type == "quay":
+
+                self.project.quay_points[
+                    self.dragging_point
+                ] = (
+                    event.xdata,
+                    event.ydata
+                )
+
+            self.redraw()
+
+            return
+
         if not self.panning:
             return
 
@@ -1505,6 +1550,8 @@ class MooringPlanner:
         """
 
         self.panning = False
+        self.dragging_point = None
+        self.dragging_type = None
 
     def axis_mode(self, x, y):
         """
@@ -1749,7 +1796,23 @@ class MooringPlanner:
             "YAML file exported successfully."
         )
 
+    def start_move(self, x, y):
 
+        b = self.nearest_barge(x, y)
+
+        if b is not None:
+            self.dragging_point = b
+            self.dragging_type = "barge"
+
+            return
+
+        q = self.nearest_quay(x, y)
+
+        if q is not None:
+            self.dragging_point = q
+            self.dragging_type = "quay"
+
+            return
 
 
 
