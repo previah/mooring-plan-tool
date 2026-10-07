@@ -1046,6 +1046,10 @@ class MooringPlanner:
 
             self.set_bollard_position(action[1], action[1]["old"])
 
+        elif kind == "snapshot":
+
+            self.restore_bollard_state(action[1]["before"])
+
         self.redraw()
 
     # =====================================================
@@ -1093,7 +1097,68 @@ class MooringPlanner:
 
             self.set_bollard_position(action[1], action[1]["new"])
 
+        elif kind == "snapshot":
+
+            self.restore_bollard_state(action[1]["after"])
+
         self.redraw()
+
+    def capture_bollard_state(self):
+        """
+        Capture bollards, mooring lines, and counters so a bulk edit can be undone or redone.
+        """
+
+        return {
+            "barge_points": dict(self.project.barge_points),
+            "quay_points": dict(self.project.quay_points),
+            # Keep the original line objects so other undo entries that refer to them stay valid
+            "lines": [
+                (line, dict(line))
+                for line in self.project.lines
+            ],
+            "barge_counter": self.project.barge_counter,
+            "quay_counter": self.project.quay_counter
+        }
+
+    def restore_bollard_state(self, state):
+        """
+        Restore bollards, mooring lines, and counters from a captured state.
+        """
+
+        self.project.barge_points = dict(state["barge_points"])
+        self.project.quay_points = dict(state["quay_points"])
+
+        lines = []
+
+        for line, values in state["lines"]:
+            line.clear()
+            line.update(values)
+            lines.append(line)
+
+        self.project.lines = lines
+
+        self.project.barge_counter = state["barge_counter"]
+        self.project.quay_counter = state["quay_counter"]
+
+        self.pending_line_start = None
+        self.pending_line_end = None
+
+    def record_snapshot(self, before):
+        """
+        Add a bulk edit to the undo history using the state captured before the edit.
+        """
+
+        self.undo_stack.append(
+            (
+                "snapshot",
+                {
+                    "before": before,
+                    "after": self.capture_bollard_state()
+                }
+            )
+        )
+
+        self.redo_stack.clear()
 
     def set_bollard_position(self, move, position):
         """
@@ -1745,6 +1810,8 @@ class MooringPlanner:
 
             return new_points, mapping
 
+        before = self.capture_bollard_state()
+
         self.project.barge_points, mapping = renumber(
             self.project.barge_points,
             "B"
@@ -1772,6 +1839,8 @@ class MooringPlanner:
                 len(self.project.quay_points) + 1
         )
 
+        self.record_snapshot(before)
+
         self.redraw()
 
     def clear_lines(self):
@@ -1787,7 +1856,11 @@ class MooringPlanner:
         if not answer:
             return
 
-        self.project.lines.clear()
+        before = self.capture_bollard_state()
+
+        self.project.lines = []
+
+        self.record_snapshot(before)
 
         self.redraw()
 
@@ -1805,11 +1878,15 @@ class MooringPlanner:
         if not answer:
             return
 
-        self.project.barge_points.clear()
+        before = self.capture_bollard_state()
 
-        self.project.lines.clear()
+        self.project.barge_points = {}
+
+        self.project.lines = []
 
         self.project.barge_counter = 1
+
+        self.record_snapshot(before)
 
         self.redraw()
 
@@ -1827,11 +1904,15 @@ class MooringPlanner:
         if not answer:
             return
 
-        self.project.quay_points.clear()
+        before = self.capture_bollard_state()
 
-        self.project.lines.clear()
+        self.project.quay_points = {}
+
+        self.project.lines = []
 
         self.project.quay_counter = 1
+
+        self.record_snapshot(before)
 
         self.redraw()
 

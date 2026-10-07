@@ -94,10 +94,11 @@ The top controls are **Home**, **Load Drawing**, **Save Project**, **Load Projec
 
 Undo/redo is partial rather than a full project-state history:
 
-- Undo is implemented for adding bollards and lines, setting the origin, moving bollards, and deleting individual bollards or lines. **Undo** and **Redo** are also available with **Ctrl+Z** and **Ctrl+Y**.
-- Redo is implemented for lines, bollard moves, and individual delete actions, but not for adding bollards or setting the origin.
+- Undo is implemented for adding bollards and lines, setting the origin, moving bollards, deleting individual bollards or lines, renumbering, and the **Clear Lines**, **Clear Barge**, and **Clear Quay** actions. **Undo** and **Redo** are also available with **Ctrl+Z** and **Ctrl+Y**.
+- Redo is implemented for lines, bollard moves, individual delete actions, renumbering, and the clear actions, but not for adding bollards or setting the origin.
+- Renumbering and clear actions save the bollards, lines, and counters before and after the change, so undoing them also restores the names used by earlier undo steps.
 - Deleting a bollard removes connected lines, but undoing that bollard deletion restores only the bollard, not its removed lines.
-- Clear actions, renumbering, scale changes, and axis changes are not recorded in the undo history.
+- Scale changes and axis changes are not recorded in the undo history.
 
 ## Exports
 
