@@ -132,6 +132,7 @@ class MooringPlanner:
         # =====================================================
         self.dragging_point = None
         self.dragging_type = None
+        self.drag_start_position = None
 
     def setup_bindings(self):
         """
@@ -159,6 +160,20 @@ class MooringPlanner:
             "<KeyRelease-Control_R>",
             self.ctrl_release
         )
+
+        for sequence in ("<Control-z>", "<Control-Z>"):
+            self.root.bind(sequence, self.on_undo_shortcut)
+
+        for sequence in ("<Control-y>", "<Control-Y>"):
+            self.root.bind(sequence, self.on_redo_shortcut)
+
+    def on_undo_shortcut(self, event):
+        self.undo()
+        return "break"
+
+    def on_redo_shortcut(self, event):
+        self.redo()
+        return "break"
 
     def setup_canvas_events(self):
         """
@@ -1027,6 +1042,10 @@ class MooringPlanner:
 
             self.project.lines.append(action[1])
 
+        elif kind == "move":
+
+            self.set_bollard_position(action[1], action[1]["old"])
+
         self.redraw()
 
     # =====================================================
@@ -1070,7 +1089,25 @@ class MooringPlanner:
             if action[1] in self.project.lines:
                 self.project.lines.remove(action[1])
 
+        elif kind == "move":
+
+            self.set_bollard_position(action[1], action[1]["new"])
+
         self.redraw()
+
+    def set_bollard_position(self, move, position):
+        """
+        Place a moved bollard at the given position, if it still exists.
+        """
+
+        points = (
+            self.project.barge_points
+            if move["type"] == "barge"
+            else self.project.quay_points
+        )
+
+        if move["name"] in points:
+            points[move["name"]] = position
 
     # =====================================================
     # EXPORT
@@ -1589,12 +1626,42 @@ class MooringPlanner:
 
     def on_mouse_release(self, event):
         """
-        Complete any active panning operation.
+        Complete any active panning or bollard-move operation.
         """
 
         self.panning = False
+
+        if self.dragging_point is not None:
+
+            points = (
+                self.project.barge_points
+                if self.dragging_type == "barge"
+                else self.project.quay_points
+            )
+
+            new_position = points.get(self.dragging_point)
+
+            if (
+                    new_position is not None
+                    and new_position != self.drag_start_position
+            ):
+                self.undo_stack.append(
+                    (
+                        "move",
+                        {
+                            "type": self.dragging_type,
+                            "name": self.dragging_point,
+                            "old": self.drag_start_position,
+                            "new": new_position
+                        }
+                    )
+                )
+
+                self.redo_stack.clear()
+
         self.dragging_point = None
         self.dragging_type = None
+        self.drag_start_position = None
 
     def axis_mode(self, x, y):
         """
@@ -1865,6 +1932,7 @@ class MooringPlanner:
         if b is not None:
             self.dragging_point = b
             self.dragging_type = "barge"
+            self.drag_start_position = self.project.barge_points[b]
 
             return
 
@@ -1873,6 +1941,7 @@ class MooringPlanner:
         if q is not None:
             self.dragging_point = q
             self.dragging_type = "quay"
+            self.drag_start_position = self.project.quay_points[q]
 
             return
 
