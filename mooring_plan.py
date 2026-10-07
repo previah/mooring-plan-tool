@@ -1543,8 +1543,8 @@ class MooringPlanner:
                 self.project.barge_points[
                     self.dragging_point
                 ] = (
-                    event.xdata,
-                    event.ydata
+                    float(event.xdata),
+                    float(event.ydata)
                 )
 
             elif self.dragging_type == "quay":
@@ -1552,8 +1552,8 @@ class MooringPlanner:
                 self.project.quay_points[
                     self.dragging_point
                 ] = (
-                    event.xdata,
-                    event.ydata
+                    float(event.xdata),
+                    float(event.ydata)
                 )
 
             self.redraw()
@@ -1793,8 +1793,8 @@ class MooringPlanner:
             data["Poi"][name] = {
                 "parent": "Barge",
                 "position": FlowStyleList([
-                    round(x, 3),
-                    round(y, 3),
+                    round(float(x), 3),
+                    round(float(y), 3),
                     0.0
                 ])
             }
@@ -1808,8 +1808,8 @@ class MooringPlanner:
             data["Poi"][name] = {
                 "parent": "Quay",
                 "position": FlowStyleList([
-                    round(x, 3),
-                    round(y, 3),
+                    round(float(x), 3),
+                    round(float(y), 3),
                     0.0
                 ])
             }
