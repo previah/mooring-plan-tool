@@ -1634,40 +1634,59 @@ class MooringPlanner:
         self.redraw()
 
     def renumber_bollards(self):
+        """
+        Renumber bollards in ascending coordinate order: by X first, then by Y
+        when X is equal. Uses the defined coordinate system if an origin exists,
+        otherwise drawing coordinates with Y pointing up.
+        """
 
-        new_barge_points = {}
+        if self.project.origin is not None:
+            ox, oy = self.project.origin
 
-        mapping = {}
-
-        for i, old_name in enumerate(
-                sorted(self.project.barge_points.keys()),
-                start=1):
-            new_name = f"B{i}"
-
-            mapping[old_name] = new_name
-
-            new_barge_points[new_name] = (
-                self.project.barge_points[old_name]
+            transformer = CoordinateTransformer(
+                CoordinateSystem(
+                    origin_x=ox,
+                    origin_y=oy,
+                    scale=self.project.scale_factor
+                    if self.project.scale_factor is not None
+                    else 1.0,
+                    rotation_deg=self.project.rotation_deg
+                )
             )
 
-        self.project.barge_points = new_barge_points
+            def sort_key(p):
+                x, y = transformer.image_to_world(p[0], p[1])
+                # Rounding prevents floating-point noise from deciding ties
+                return round(x, 3), round(y, 3)
+        else:
+            def sort_key(p):
+                return round(p[0], 3), round(-p[1], 3)
 
-        new_quay_points = {}
-
-        quay_mapping = {}
-
-        for i, old_name in enumerate(
-                sorted(self.project.quay_points.keys()),
-                start=1):
-            new_name = f"Q{i}"
-
-            quay_mapping[old_name] = new_name
-
-            new_quay_points[new_name] = (
-                self.project.quay_points[old_name]
+        def renumber(points, prefix):
+            ordered = sorted(
+                points.items(),
+                key=lambda item: sort_key(item[1])
             )
 
-        self.project.quay_points = new_quay_points
+            mapping = {}
+            new_points = {}
+
+            for i, (old_name, p) in enumerate(ordered, start=1):
+                new_name = f"{prefix}{i}"
+                mapping[old_name] = new_name
+                new_points[new_name] = p
+
+            return new_points, mapping
+
+        self.project.barge_points, mapping = renumber(
+            self.project.barge_points,
+            "B"
+        )
+
+        self.project.quay_points, quay_mapping = renumber(
+            self.project.quay_points,
+            "Q"
+        )
 
         for line in self.project.lines:
             line["from"] = mapping[

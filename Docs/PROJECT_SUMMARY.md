@@ -82,7 +82,7 @@ Projects are saved as JSON in files with the `.mpl` extension. The saved data in
 - Move bollards by dragging them. Mooring lines use endpoint names, so they render from the bollards' updated positions.
 - Delete an individual line or bollard. Deleting a bollard also removes its connected lines.
 - Clear all lines, all barge bollards, or all quay bollards.
-- Renumber bollards as `B1...` and `Q1...`, updating connected line endpoint names.
+- Renumber bollards as `B1...` and `Q1...` in ascending coordinate order (X first, then Y when X is equal), updating connected line endpoint names. World coordinates are used when an origin is defined; otherwise drawing coordinates with Y pointing up.
 - Undo/redo actions using action entries in in-memory stacks.
 - Zoom around the pointer with **Ctrl + mouse wheel**.
 - Pan with the middle mouse button. A Matplotlib navigation toolbar is also included.
