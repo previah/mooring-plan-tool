@@ -38,6 +38,8 @@ The origin and axis point are stored as image-coordinate tuples in `MooringProje
 
 The scale factor is the entered distance divided by the pixel distance between the selected points. Scale reference points are held in `MooringPlanner.scale_points`, not in `MooringProject`.
 
+Selecting **Scale** starts a new two-point measurement and clears the previous scale factor, reference points, and preview. A dashed line follows the cursor after the first point, with a live angle label beside that first point. Selecting the second point draws a solid line and prompts for the actual distance. Completing the measurement exits scale mode, preventing additional scale points until **Scale** is selected again.
+
 ### Image-to-world conversion
 
 `CoordinateTransformer.image_to_world(x, y)` first offsets the image point from the origin, flips the image Y direction, applies the scale, then rotates by the negative of `rotation_deg`:

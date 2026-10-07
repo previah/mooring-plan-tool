@@ -7,7 +7,7 @@ class PlotRenderer:
 
         self.ax = ax
 
-    def draw_scale_points(self, scale_points):
+    def draw_scale_points(self, scale_points, scale_preview=None):
 
         for i, p in enumerate(scale_points):
             self.ax.plot(
@@ -23,7 +23,41 @@ class PlotRenderer:
                 color="red"
             )
 
-        # todo: the scale points cannot be changed once created.
+        if len(scale_points) >= 2:
+            p1, p2 = scale_points[:2]
+            self.ax.plot(
+                [p1[0], p2[0]],
+                [p1[1], p2[1]],
+                color="red",
+                linewidth=2
+            )
+        elif scale_points and scale_preview is not None:
+            p1 = scale_points[0]
+            self.ax.plot(
+                [p1[0], scale_preview[0]],
+                [p1[1], scale_preview[1]],
+                "--",
+                color="red",
+                linewidth=2
+            )
+
+            dx = scale_preview[0] - p1[0]
+            dy = p1[1] - scale_preview[1]
+            angle = math.degrees(math.atan2(dy, dx))
+
+            self.ax.annotate(
+                f"{angle:.1f}°",
+                xy=p1,
+                xytext=(8, 12),
+                textcoords="offset points",
+                color="yellow",
+                fontsize=10,
+                bbox=dict(
+                    facecolor="black",
+                    alpha=0.7,
+                    edgecolor="none"
+                )
+            )
 
 
     def draw_barge_bollards(

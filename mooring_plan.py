@@ -72,6 +72,7 @@ class MooringPlanner:
         self.shift_pressed = False
 
         self.axis_preview = None
+        self.scale_preview = None
 
 
         # =====================================================
@@ -543,10 +544,16 @@ class MooringPlanner:
             pass
 
         self.mode = mode
+        self.scale_preview = None
+        if mode == "scale":
+            self.scale_points.clear()
+            self.project.scale_factor = None
 
         self.status.config(
             text=f"Mode: {mode}"
         )
+
+        self.redraw()
 
     # =====================================================
     # FILE LOAD
@@ -640,7 +647,8 @@ class MooringPlanner:
 
         # scale points
         self.renderer.draw_scale_points(
-            self.scale_points
+            self.scale_points,
+            self.scale_preview
         )
 
         # origin/coordinate system
@@ -773,12 +781,33 @@ class MooringPlanner:
 
             pixels = math.dist(p1, p2)
 
+            if pixels == 0:
+                self.scale_points.pop()
+                messagebox.showerror(
+                    "Scale",
+                    "The two scale points must be different."
+                )
+                self.redraw()
+                return
+
+            self.scale_preview = None
+            self.redraw()
+
             real = simpledialog.askfloat(
                 "Scale",
                 "Actual distance"
             )
 
+            if real is None:
+                self.scale_points.pop()
+                self.redraw()
+                return
+
             self.project.scale_factor = real / pixels
+            self.mode = "none"
+            self.status.config(
+                text=f"Scale defined ({self.project.scale_factor:.6f})"
+            )
 
             messagebox.showinfo(
                 "Scale",
@@ -1479,6 +1508,20 @@ class MooringPlanner:
                 return
 
             self.axis_preview = (
+                event.xdata,
+                event.ydata
+            )
+
+            self.redraw()
+
+            return
+
+        if self.mode == "scale" and len(self.scale_points) == 1:
+
+            if event.xdata is None or event.ydata is None:
+                return
+
+            self.scale_preview = (
                 event.xdata,
                 event.ydata
             )
