@@ -76,6 +76,8 @@ quay_counter
 
 Projects are saved as JSON in files with the `.mpl` extension. The saved data includes the fields above, but not the current view, undo/redo history, or pending interaction state. Loading restores project data and attempts to reload the referenced drawing. Older files retain their scale factor, but their unsaved reference points and entered distance cannot be recovered; define the scale again and save to preserve those details.
 
+Closing with unsaved project changes prompts to save and close, close without saving, or cancel. Canceling the save dialog keeps the application open. Changes are detected by comparing current project data with the last successful save or load (or the initial empty project), so navigation alone does not trigger the warning.
+
 ## Implemented interactions
 
 - Load raster drawings (`png`, `jpg`, `jpeg`, `bmp`, `tif`) and the first page of a PDF.

@@ -14,6 +14,7 @@ import fitz
 from PIL import Image
 
 import json
+from dataclasses import asdict
 
 from models import CoordinateSystem, CoordinateTransformer, MooringProject
 from plot_renderer import PlotRenderer
@@ -46,6 +47,7 @@ class MooringPlanner:
         # Project data
         # =====================================================
         self.project = MooringProject()
+        self.saved_project_state = self.project_state()
 
 
         # =====================================================
@@ -383,6 +385,9 @@ class MooringPlanner:
 
         self.setup_canvas_events()
 
+    def project_state(self):
+        return json.dumps(asdict(self.project), sort_keys=True)
+
     def save_project(self):
         """
         Save the current mooring project to a project file, including drawing references, coordinate-system settings,
@@ -395,30 +400,20 @@ class MooringPlanner:
         )
 
         if not filename:
-            return
+            return False
 
-        data = {
-            "background_file": self.project.background_file,
-            "scale_factor": self.project.scale_factor,
-            "scale_points": self.project.scale_points,
-            "scale_distance": self.project.scale_distance,
-            "origin": self.project.origin,
-            "barge_points": self.project.barge_points,
-            "quay_points": self.project.quay_points,
-            "lines": self.project.lines,
-            "barge_counter": self.project.barge_counter,
-            "quay_counter": self.project.quay_counter,
-            "axis_point": self.project.axis_point,
-            "rotation_deg": self.project.rotation_deg
-        }
+        data = asdict(self.project)
 
         with open(filename, "w") as f:
             json.dump(data, f, indent=4)
+
+        self.saved_project_state = self.project_state()
 
         messagebox.showinfo(
             "Save",
             "Project saved successfully."
         )
+        return True
 
     def load_project(self):
         """
@@ -493,6 +488,8 @@ class MooringPlanner:
             self.pending_line_end = None
 
             self.redraw()
+
+            self.saved_project_state = self.project_state()
 
             messagebox.showinfo(
                 "Load Project",
@@ -1531,17 +1528,33 @@ class MooringPlanner:
         Confirm and close the application.
         """
 
-        answer = messagebox.askyesno(
-            "Exit",
-            "Close Mooring Planner?"
-        )
+        if self.project_state() != self.saved_project_state:
+            answer = messagebox.askyesnocancel(
+                "Unsaved Project",
+                "The project has unsaved changes.\n\n"
+                "Save before closing?\n\n"
+                "Yes: Save and close\n"
+                "No: Close without saving\n"
+                "Cancel: Keep working",
+                icon="warning"
+            )
+            if answer is None:
+                return
+            if answer and not self.save_project():
+                return
+        else:
+            answer = messagebox.askyesno(
+                "Exit",
+                "Close Mooring Planner?"
+            )
+            if not answer:
+                return
 
-        if answer:
-            plt.close('all')
+        plt.close('all')
 
-            self.root.quit()
+        self.root.quit()
 
-            self.root.destroy()
+        self.root.destroy()
 
     def ctrl_press(self, event):
         """
