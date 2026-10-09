@@ -89,6 +89,7 @@ Projects are saved as JSON in files with the `.mpl` extension. The saved data in
 - Zoom around the pointer with **Ctrl + mouse wheel**.
 - Pan with the middle mouse button. A Matplotlib navigation toolbar is also included.
 - Reset the view with **Home**.
+- Show the pointer's world X/Y coordinates in the status area, using the origin, scale, and X-axis rotation. Without a scale, coordinates are labelled as pixels; without an origin, the readout prompts to set one. Moving outside the plot clears the numeric readout without overwriting mode or action messages.
 
 The top controls are **Home**, **Load Drawing**, **Save Project**, **Load Project**, **Scale**, **Origin**, **X-Axis**, **Barge Bollard**, **Quay Bollard**, **Move**, **Add Line**, **Undo**, **Redo**, **Delete**, **Clear Lines**, **Clear Barge**, **Clear Quay**, **Renumber**, **Export**, and **Export YAML**.
 
@@ -120,7 +121,6 @@ Undo/redo is partial rather than a full project-state history:
 
 These are not implemented in the current scripts:
 
-- Show the pointer's world coordinates in the status area.
 - Make existing scale reference points individually editable (currently selecting **Scale** replaces the entire measurement).
 - Provide controls to clear or redefine the coordinate origin and axis.
 - Replace line dictionaries and bollard tuples/dictionaries with dedicated dataclasses.

@@ -208,6 +208,11 @@ class MooringPlanner:
             self.on_mouse_move
         )
 
+        self.canvas.mpl_connect(
+            "figure_leave_event",
+            self.update_pointer_coordinates
+        )
+
     def create_gui(self):
         """
         Create the application user interface, including tool buttons, status bar, plotting canvas, and matplotlib
@@ -337,12 +342,21 @@ class MooringPlanner:
             command=self.export_yaml
         ).pack(side=tk.LEFT)
 
+        status_area = tk.Frame(self.root)
+        status_area.pack(fill=tk.X)
+
         self.status = tk.Label(
-            self.root,
+            status_area,
             text="Ready"
         )
 
-        self.status.pack(fill=tk.X)
+        self.status.pack(side=tk.LEFT)
+
+        self.pointer_coordinates = tk.Label(
+            status_area,
+            text="World coordinates: set origin"
+        )
+        self.pointer_coordinates.pack(side=tk.RIGHT)
 
         self.fig, self.ax = plt.subplots(figsize=(10, 8))
 
@@ -1608,10 +1622,44 @@ class MooringPlanner:
 
             self.canvas.draw_idle()
 
+    def update_pointer_coordinates(self, event):
+        if self.project.origin is None:
+            self.pointer_coordinates.config(text="World coordinates: set origin")
+            return
+
+        if (
+                event.inaxes != self.ax
+                or event.xdata is None
+                or event.ydata is None
+        ):
+            self.pointer_coordinates.config(text="X = --    Y = --")
+            return
+
+        ox, oy = self.project.origin
+        transformer = CoordinateTransformer(
+            CoordinateSystem(
+                origin_x=ox,
+                origin_y=oy,
+                scale=self.project.scale_factor
+                if self.project.scale_factor is not None
+                else 1.0,
+                rotation_deg=self.project.rotation_deg
+            )
+        )
+        x, y = transformer.image_to_world(
+            float(event.xdata), float(event.ydata)
+        )
+        units = "pixels" if self.project.scale_factor is None else "distance units"
+        self.pointer_coordinates.config(
+            text=f"X = {x:.3f}    Y = {y:.3f} ({units})"
+        )
+
     def on_mouse_move(self, event):
         """
         Handle mouse-movement events for interactive previews and panning operations.
         """
+
+        self.update_pointer_coordinates(event)
 
         if self.mode == "axis":
 
