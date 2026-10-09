@@ -15,6 +15,10 @@ class MooringProject:
 
     scale_factor: float | None = None
 
+    scale_points: list = field(default_factory=list)
+
+    scale_distance: float | None = None
+
     origin: tuple | None = None
 
     axis_point: tuple | None = None

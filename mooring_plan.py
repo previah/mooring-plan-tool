@@ -106,7 +106,6 @@ class MooringPlanner:
         # =====================================================
         # Scale Definition state
         # =====================================================
-        self.scale_points = []
 
 
         # =====================================================
@@ -387,6 +386,8 @@ class MooringPlanner:
         data = {
             "background_file": self.project.background_file,
             "scale_factor": self.project.scale_factor,
+            "scale_points": self.project.scale_points,
+            "scale_distance": self.project.scale_distance,
             "origin": self.project.origin,
             "barge_points": self.project.barge_points,
             "quay_points": self.project.quay_points,
@@ -430,6 +431,13 @@ class MooringPlanner:
             self.load_background(self.project.background_file)
 
             self.project.scale_factor = data.get("scale_factor")
+            self.project.scale_points = [
+                tuple(point) for point in data.get("scale_points", [])
+            ]
+            self.project.scale_distance = data.get("scale_distance")
+            self.scale_preview = None
+            if self.mode == "scale":
+                self.mode = "none"
 
             origin = data.get("origin")
 
@@ -561,8 +569,9 @@ class MooringPlanner:
         self.mode = mode
         self.scale_preview = None
         if mode == "scale":
-            self.scale_points.clear()
+            self.project.scale_points.clear()
             self.project.scale_factor = None
+            self.project.scale_distance = None
 
         self.status.config(
             text=f"Mode: {mode}"
@@ -662,8 +671,10 @@ class MooringPlanner:
 
         # scale points
         self.renderer.draw_scale_points(
-            self.scale_points,
-            self.scale_preview
+            self.project.scale_points,
+            self.scale_preview,
+            self.project.scale_distance,
+            self.project.scale_factor
         )
 
         # origin/coordinate system
@@ -787,17 +798,17 @@ class MooringPlanner:
         Define the drawing scale using two user-selected reference points.
         """
 
-        self.scale_points.append((x, y))
+        self.project.scale_points.append((x, y))
 
-        if len(self.scale_points) == 2:
+        if len(self.project.scale_points) == 2:
 
-            p1 = self.scale_points[0]
-            p2 = self.scale_points[1]
+            p1 = self.project.scale_points[0]
+            p2 = self.project.scale_points[1]
 
             pixels = math.dist(p1, p2)
 
             if pixels == 0:
-                self.scale_points.pop()
+                self.project.scale_points.pop()
                 messagebox.showerror(
                     "Scale",
                     "The two scale points must be different."
@@ -814,11 +825,12 @@ class MooringPlanner:
             )
 
             if real is None:
-                self.scale_points.pop()
+                self.project.scale_points.pop()
                 self.redraw()
                 return
 
             self.project.scale_factor = real / pixels
+            self.project.scale_distance = real
             self.mode = "none"
             self.status.config(
                 text=f"Scale defined ({self.project.scale_factor:.6f})"
@@ -1618,7 +1630,7 @@ class MooringPlanner:
 
             return
 
-        if self.mode == "scale" and len(self.scale_points) == 1:
+        if self.mode == "scale" and len(self.project.scale_points) == 1:
 
             if event.xdata is None or event.ydata is None:
                 return

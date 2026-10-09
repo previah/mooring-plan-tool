@@ -7,7 +7,10 @@ class PlotRenderer:
 
         self.ax = ax
 
-    def draw_scale_points(self, scale_points, scale_preview=None):
+    def draw_scale_points(
+            self, scale_points, scale_preview=None,
+            scale_distance=None, scale_factor=None
+    ):
 
         for i, p in enumerate(scale_points):
             self.ax.plot(
@@ -31,6 +34,16 @@ class PlotRenderer:
                 color="red",
                 linewidth=2
             )
+            if scale_distance is not None:
+                self.ax.annotate(
+                    f"Scale distance: {scale_distance:g}",
+                    xy=((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2),
+                    xytext=(0, 12),
+                    textcoords="offset points",
+                    ha="center",
+                    color="red",
+                    bbox=dict(facecolor="white", alpha=0.8, edgecolor="none")
+                )
         elif scale_points and scale_preview is not None:
             p1 = scale_points[0]
             self.ax.plot(
@@ -59,6 +72,15 @@ class PlotRenderer:
                 )
             )
 
+        if scale_factor is not None:
+            self.ax.text(
+                0.01, 0.99,
+                f"Scale: {scale_factor:g} distance units/pixel",
+                transform=self.ax.transAxes,
+                va="top",
+                color="red",
+                bbox=dict(facecolor="white", alpha=0.8, edgecolor="none")
+            )
 
     def draw_barge_bollards(
             self,

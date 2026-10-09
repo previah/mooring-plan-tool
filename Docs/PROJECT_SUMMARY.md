@@ -36,7 +36,7 @@ Contains `PlotRenderer`, which draws scale points, the coordinate-system origin 
 
 The origin and axis point are stored as image-coordinate tuples in `MooringProject`. `rotation_deg` is calculated from the origin-to-axis direction. The scale is defined separately by selecting two reference points and entering their real-world distance.
 
-The scale factor is the entered distance divided by the pixel distance between the selected points. Scale reference points are held in `MooringPlanner.scale_points`, not in `MooringProject`.
+The scale factor is the entered distance divided by the pixel distance between the selected points. `MooringProject` stores the scale reference points and entered distance alongside the factor. The reference line and distance label remain visible after saving and loading. A fixed label at the top-left of the plot shows the factor in distance units per pixel, including for older projects that did not save reference points.
 
 Selecting **Scale** starts a new two-point measurement and clears the previous scale factor, reference points, and preview. A dashed line follows the cursor after the first point, with a live angle label beside that first point. Selecting the second point draws a solid line and prompts for the actual distance. Completing the measurement exits scale mode, preventing additional scale points until **Scale** is selected again.
 
@@ -62,6 +62,8 @@ This is the transformation currently used for exported bollard coordinates. The 
 ```text
 background_file
 scale_factor
+scale_points
+scale_distance
 origin
 axis_point
 rotation_deg
@@ -72,7 +74,7 @@ barge_counter
 quay_counter
 ```
 
-Projects are saved as JSON in files with the `.mpl` extension. The saved data includes the fields above, but not the separate scale reference points, current view, undo/redo history, or pending interaction state. Loading restores project data and attempts to reload the referenced drawing.
+Projects are saved as JSON in files with the `.mpl` extension. The saved data includes the fields above, but not the current view, undo/redo history, or pending interaction state. Loading restores project data and attempts to reload the referenced drawing. Older files retain their scale factor, but their unsaved reference points and entered distance cannot be recovered; define the scale again and save to preserve those details.
 
 ## Implemented interactions
 
@@ -119,7 +121,7 @@ Undo/redo is partial rather than a full project-state history:
 These are not implemented in the current scripts:
 
 - Show the pointer's world coordinates in the status area.
-- Make scale reference points editable and include them in saved projects if needed.
+- Make existing scale reference points individually editable (currently selecting **Scale** replaces the entire measurement).
 - Provide controls to clear or redefine the coordinate origin and axis.
 - Replace line dictionaries and bollard tuples/dictionaries with dedicated dataclasses.
 - Make undo/redo cover all editing operations using complete or appropriately detailed state snapshots.
