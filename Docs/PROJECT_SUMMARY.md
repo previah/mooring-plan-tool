@@ -82,15 +82,15 @@ Closing with unsaved project changes prompts to save and close, close without sa
 
 ## Implemented interactions
 
-- **Add Fender** places orange diamond markers named `F1`, `F2`, etc. Fenders support **Move**, **Delete**, undo/redo, project save/load, and unsaved-change detection. They are included in the plan image and a separate `fenders.csv`, but are not mooring-line endpoints or entries in the bollard CSV or analysis YAML. Bollard renumbering and Clear Barge/Quay do not rename or delete fenders. Older project files load with no fenders.
+- **Add Fender** places orange diamond markers named `F1`, `F2`, etc. Fenders support **Move**, **Delete**, renumbering, undo/redo, project save/load, and unsaved-change detection. They are included in the plan image and a separate `fenders.csv`, but are not mooring-line endpoints or entries in the bollard CSV or analysis YAML. Clear Barge/Quay do not delete fenders. Older project files load with no fenders.
 - Load raster drawings (`png`, `jpg`, `jpeg`, `bmp`, `tif`) and the first page of a PDF.
 - Set scale, origin, and positive X-axis.
 - Add barge and quay bollards; add a mooring line by selecting a barge bollard and then a quay bollard and naming the line.
-- Move bollards by dragging them. Mooring lines use endpoint names, so they render from the bollards' updated positions.
+- Move bollards and fenders by dragging them. **Move** chooses the closest marker centre within 10 screen pixels at any zoom level. Mooring lines use endpoint names, so they render from the bollards' updated positions.
 - Delete an individual line or bollard. Deleting a bollard also removes its connected lines.
 - **Delete** selects the closest marker centre or line stroke within 10 screen pixels, regardless of zoom. Markers win exact distance ties, but a closer line can still be selected beside a marker.
 - Clear all lines, all barge bollards, or all quay bollards.
-- Renumber bollards as `B1...` and `Q1...` in ascending coordinate order (X first, then Y when X is equal), updating connected line endpoint names. World coordinates are used when an origin is defined; otherwise drawing coordinates with Y pointing up.
+- Renumber bollards and fenders separately as `B1...`, `Q1...`, and `F1...` in ascending coordinate order (X first, then Y when X is equal), updating connected line endpoint names. World coordinates are used when an origin is defined; otherwise drawing coordinates with Y pointing up. Undo/redo restores all three groups and their counters.
 - Undo/redo actions using action entries in in-memory stacks.
 - Zoom around the pointer with **Ctrl + mouse wheel**.
 - Pan with the middle mouse button. A Matplotlib navigation toolbar is also included.

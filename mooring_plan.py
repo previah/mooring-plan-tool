@@ -1444,8 +1444,8 @@ class MooringPlanner:
                 Image.open(filename)
             )
 
-    def nearest_delete_target(self, x, y):
-        """Find the closest marker centre or line stroke within 10 screen pixels."""
+    def nearest_marker_target(self, x, y):
+        """Find the closest bollard or fender within 10 screen pixels."""
         click = self.ax.transData.transform((x, y))
         best_distance = 10
         target = None
@@ -1457,6 +1457,20 @@ class MooringPlanner:
                 if distance < best_distance:
                     best_distance = distance
                     target = (kind, name)
+
+        return target
+
+    def nearest_delete_target(self, x, y):
+        """Find the closest marker centre or line stroke within 10 screen pixels."""
+        click = self.ax.transData.transform((x, y))
+        target = self.nearest_marker_target(x, y)
+        best_distance = 10
+        if target is not None:
+            kind, name = target
+            best_distance = math.dist(
+                click,
+                self.ax.transData.transform(self.marker_points(kind)[name])
+            )
 
         for line in self.project.lines:
             p1 = self.ax.transData.transform(
@@ -1984,6 +1998,12 @@ class MooringPlanner:
             "Q"
         )
 
+        self.project.fender_points, _ = renumber(
+            self.project.fender_points,
+            "F"
+        )
+        self.project.fender_counter = len(self.project.fender_points) + 1
+
         for line in self.project.lines:
             line["from"] = mapping[
                 line["from"]
@@ -2169,30 +2189,12 @@ class MooringPlanner:
         )
 
     def start_move(self, x, y):
-
-        b = self.nearest_barge(x, y)
-
-        if b is not None:
-            self.dragging_point = b
-            self.dragging_type = "barge"
-            self.drag_start_position = self.project.barge_points[b]
-
-            return
-
-        q = self.nearest_quay(x, y)
-
-        if q is not None:
-            self.dragging_point = q
-            self.dragging_type = "quay"
-            self.drag_start_position = self.project.quay_points[q]
-
-            return
-
-        fender = self.nearest_fender(x, y)
-        if fender is not None:
-            self.dragging_point = fender
-            self.dragging_type = "fender"
-            self.drag_start_position = self.project.fender_points[fender]
+        target = self.nearest_marker_target(x, y)
+        if target is not None:
+            kind, name = target
+            self.dragging_point = name
+            self.dragging_type = kind
+            self.drag_start_position = self.marker_points(kind)[name]
 
 
 
