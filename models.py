@@ -35,6 +35,10 @@ class MooringProject:
 
     quay_counter: int = 1
 
+    fender_points: dict = field(default_factory=dict)
+
+    fender_counter: int = 1
+
 
 @dataclass
 class CoordinateSystem:

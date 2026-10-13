@@ -82,6 +82,15 @@ class PlotRenderer:
                 bbox=dict(facecolor="white", alpha=0.8, edgecolor="none")
             )
 
+    def draw_fenders(self, fender_points):
+        for name, point in fender_points.items():
+            self.ax.plot(
+                point[0], point[1],
+                marker="D", markersize=8,
+                color="orange", markeredgecolor="black"
+            )
+            self.ax.text(point[0], point[1], name, color="darkorange")
+
     def draw_barge_bollards(
             self,
             barge_points,

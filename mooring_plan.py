@@ -280,6 +280,12 @@ class MooringPlanner:
 
         tk.Button(
             top,
+            text="Fender",
+            command=lambda: self.set_mode("fender")
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            top,
             text="Move",
             command=lambda: self.set_mode("move")
         ).pack(side=tk.LEFT)
@@ -466,6 +472,17 @@ class MooringPlanner:
             }
 
             self.project.lines = data.get("lines", [])
+            self.project.fender_points = {
+                k: tuple(v)
+                for k, v in data.get("fender_points", {}).items()
+            }
+            self.project.fender_counter = data.get(
+                "fender_counter",
+                max(
+                    (int(name[1:]) for name in self.project.fender_points),
+                    default=0
+                ) + 1
+            )
 
             self.project.barge_counter = data.get(
                 "barge_counter",
@@ -710,6 +727,9 @@ class MooringPlanner:
         )
 
         # lines
+        self.renderer.draw_fenders(self.project.fender_points)
+
+        # lines
         self.renderer.draw_mooring_lines(
             self.project.lines,
             self.project.barge_points,
@@ -799,6 +819,10 @@ class MooringPlanner:
         elif self.mode == "move":
 
             self.start_move(x, y)
+
+        elif self.mode == "fender":
+
+            self.fender_mode(x, y)
 
     # =====================================================
     # SCALE
@@ -916,6 +940,31 @@ class MooringPlanner:
     # =====================================================
     # FIND POINT
     # =====================================================
+
+    def fender_mode(self, x, y):
+        before = self.capture_bollard_state()
+        name = f"F{self.project.fender_counter}"
+        self.project.fender_points[name] = (float(x), float(y))
+        self.project.fender_counter += 1
+        self.record_snapshot(before)
+        self.redraw()
+
+    def nearest_fender(self, x, y):
+        best = None
+        distance = 20
+        for name, point in self.project.fender_points.items():
+            candidate = math.dist((x, y), point)
+            if candidate < distance:
+                best = name
+                distance = candidate
+        return best
+
+    def marker_points(self, marker_type):
+        return {
+            "barge": self.project.barge_points,
+            "quay": self.project.quay_points,
+            "fender": self.project.fender_points
+        }[marker_type]
 
     def nearest_barge(self, x, y):
         """
@@ -1134,6 +1183,8 @@ class MooringPlanner:
         return {
             "barge_points": dict(self.project.barge_points),
             "quay_points": dict(self.project.quay_points),
+            "fender_points": dict(self.project.fender_points),
+            "fender_counter": self.project.fender_counter,
             # Keep the original line objects so other undo entries that refer to them stay valid
             "lines": [
                 (line, dict(line))
@@ -1150,6 +1201,8 @@ class MooringPlanner:
 
         self.project.barge_points = dict(state["barge_points"])
         self.project.quay_points = dict(state["quay_points"])
+        self.project.fender_points = dict(state["fender_points"])
+        self.project.fender_counter = state["fender_counter"]
 
         lines = []
 
@@ -1188,11 +1241,7 @@ class MooringPlanner:
         Place a moved bollard at the given position, if it still exists.
         """
 
-        points = (
-            self.project.barge_points
-            if move["type"] == "barge"
-            else self.project.quay_points
-        )
+        points = self.marker_points(move["type"])
 
         if move["name"] in points:
             points[move["name"]] = position
@@ -1203,7 +1252,7 @@ class MooringPlanner:
 
     def export_data(self):
         """
-        Export bollard coordinates, mooring-line data, and a plan image using the defined coordinate system.
+        Export bollard and fender coordinates, mooring-line data, and a plan image using the defined coordinate system.
         """
 
         if self.project.origin is None:
@@ -1278,6 +1327,21 @@ class MooringPlanner:
                 writer.writerow(
                     [name, "Quay", x, y]
                 )
+
+        fender_file = folder + "/fenders.csv"
+
+        with open(
+            fender_file,
+            "w",
+            newline=""
+        ) as f:
+
+            writer = csv.writer(f)
+            writer.writerow(["Name", "X", "Y"])
+
+            for name, point in self.project.fender_points.items():
+                x, y = transformer.image_to_world(point[0], point[1])
+                writer.writerow([name, x, y])
 
         line_file = folder + "/mooring_lines.csv"
 
@@ -1380,13 +1444,46 @@ class MooringPlanner:
                 Image.open(filename)
             )
 
+    def nearest_delete_target(self, x, y):
+        """Find the closest marker centre or line stroke within 10 screen pixels."""
+        click = self.ax.transData.transform((x, y))
+        best_distance = 10
+        target = None
+
+        for kind in ("barge", "quay", "fender"):
+            for name, point in self.marker_points(kind).items():
+                screen_point = self.ax.transData.transform(point)
+                distance = math.dist(click, screen_point)
+                if distance < best_distance:
+                    best_distance = distance
+                    target = (kind, name)
+
+        for line in self.project.lines:
+            p1 = self.ax.transData.transform(
+                self.project.barge_points[line["from"]]
+            )
+            p2 = self.ax.transData.transform(
+                self.project.quay_points[line["to"]]
+            )
+            distance = self.point_to_segment_distance(
+                click[0], click[1], p1[0], p1[1], p2[0], p2[1]
+            )
+            if distance < best_distance:
+                best_distance = distance
+                target = ("line", line)
+
+        return target
+
     def delete_mode(self, x, y):
         """
-        Delete the selected mooring line or bollard.
+        Delete the closest marker or mooring line in screen coordinates.
         """
 
-        # Try line first
-        line = self.nearest_line(x, y)
+        target = self.nearest_delete_target(x, y)
+        if target is None:
+            return
+        kind, item = target
+        line = item if kind == "line" else None
 
         if line is not None:
 
@@ -1406,8 +1503,7 @@ class MooringPlanner:
 
             return
 
-        # Try barge bollard
-        b = self.nearest_barge(x, y)
+        b = item if kind == "barge" else None
 
         if b is not None:
 
@@ -1438,8 +1534,7 @@ class MooringPlanner:
 
             return
 
-        # Try quay bollard
-        q = self.nearest_quay(x, y)
+        q = item if kind == "quay" else None
 
         if q is not None:
 
@@ -1465,6 +1560,18 @@ class MooringPlanner:
 
                 del self.project.quay_points[q]
 
+                self.redraw()
+
+            return
+
+        fender = item if kind == "fender" else None
+        if fender is not None:
+            if messagebox.askyesno(
+                    "Delete Fender", f"Delete fender '{fender}'?"
+            ):
+                before = self.capture_bollard_state()
+                del self.project.fender_points[fender]
+                self.record_snapshot(before)
                 self.redraw()
 
     def nearest_line(self, x, y):
@@ -1713,23 +1820,9 @@ class MooringPlanner:
             if event.ydata is None:
                 return
 
-            if self.dragging_type == "barge":
-
-                self.project.barge_points[
-                    self.dragging_point
-                ] = (
-                    float(event.xdata),
-                    float(event.ydata)
-                )
-
-            elif self.dragging_type == "quay":
-
-                self.project.quay_points[
-                    self.dragging_point
-                ] = (
-                    float(event.xdata),
-                    float(event.ydata)
-                )
+            self.marker_points(self.dragging_type)[self.dragging_point] = (
+                float(event.xdata), float(event.ydata)
+            )
 
             self.redraw()
 
@@ -1771,11 +1864,7 @@ class MooringPlanner:
 
         if self.dragging_point is not None:
 
-            points = (
-                self.project.barge_points
-                if self.dragging_type == "barge"
-                else self.project.quay_points
-            )
+            points = self.marker_points(self.dragging_type)
 
             new_position = points.get(self.dragging_point)
 
@@ -2098,6 +2187,12 @@ class MooringPlanner:
             self.drag_start_position = self.project.quay_points[q]
 
             return
+
+        fender = self.nearest_fender(x, y)
+        if fender is not None:
+            self.dragging_point = fender
+            self.dragging_type = "fender"
+            self.drag_start_position = self.project.fender_points[fender]
 
 
 
