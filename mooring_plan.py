@@ -10,7 +10,10 @@ from matplotlib.backends.backend_tkagg import (
 
 import csv
 import math
-import fitz
+import os
+import shutil
+import subprocess
+import tempfile
 from PIL import Image
 
 import json
@@ -20,6 +23,50 @@ from models import CoordinateSystem, CoordinateTransformer, MooringProject
 from plot_renderer import PlotRenderer
 
 import yaml
+
+
+def pdf_first_page_to_array(filename):
+    """Render the first PDF page at a screen-focused resolution."""
+    ghostscript = None
+    for executable in ("gswin64c", "gswin32c", "gs"):
+        ghostscript = shutil.which(executable)
+        if ghostscript:
+            break
+
+    if ghostscript is None:
+        raise FileNotFoundError(
+            "Ghostscript is required to load PDF backgrounds and must be on PATH."
+        )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_file = os.path.join(temp_dir, "page.png")
+        try:
+            subprocess.run(
+                [
+                    ghostscript,
+                    "-dSAFER",
+                    "-dBATCH",
+                    "-dNOPAUSE",
+                    "-sDEVICE=png16m",
+                    "-r144",
+                    "-dFirstPage=1",
+                    "-dLastPage=1",
+                    f"-sOutputFile={output_file}",
+                    filename
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+        except subprocess.CalledProcessError as error:
+            details = error.stderr.strip() or "Ghostscript could not render the PDF."
+            raise RuntimeError(
+                f"Unable to render PDF background: {details}"
+            ) from error
+
+        with Image.open(output_file) as image:
+            return np.array(image.convert("RGB"))
 
 
 class FlowStyleList(list):
@@ -525,29 +572,9 @@ class MooringPlanner:
             try:
 
                 if self.project.background_file.lower().endswith(".pdf"):
-
-                    doc = fitz.open(
+                    self.image_array = pdf_first_page_to_array(
                         self.project.background_file
                     )
-
-                    page = doc.load_page(0)
-
-                    pix = page.get_pixmap(
-                        matrix=fitz.Matrix(6.0, 6.0)
-                    )
-
-                    arr = np.frombuffer(
-                        pix.samples,
-                        dtype=np.uint8
-                    )
-
-                    arr = arr.reshape(
-                        pix.height,
-                        pix.width,
-                        pix.n
-                    )
-
-                    self.image_array = arr
 
                 else:
 
@@ -557,13 +584,14 @@ class MooringPlanner:
                         )
                     )
 
-            except Exception as e:
+            except Exception as error:
 
                 messagebox.showwarning(
-                    "Drawing Missing",
+                    "Drawing Unavailable",
                     f"Project loaded.\n\n"
-                    f"The original drawing could not be found:\n\n"
+                    f"The original drawing could not be loaded:\n\n"
                     f"{self.project.background_file}\n\n"
+                    f"Details: {error}\n\n"
                     f"You can load it manually."
                 )
 
@@ -628,35 +656,14 @@ class MooringPlanner:
         if not file:
             return
 
-        self.load_background(file)
-
-        self.project.background_file = file
-
-        if file.lower().endswith(".pdf"):
-
-            doc = fitz.open(file)
-            page = doc.load_page(0)
-
-            pix = page.get_pixmap(matrix=fitz.Matrix(6.0, 6.0))
-
-            arr = np.frombuffer(
-                pix.samples,
-                dtype=np.uint8
+        try:
+            self.load_background(file)
+        except (OSError, RuntimeError) as error:
+            messagebox.showerror(
+                "Drawing Load Error",
+                f"Unable to load drawing:\n\n{error}"
             )
-
-            arr = arr.reshape(
-                pix.height,
-                pix.width,
-                pix.n
-            )
-
-            self.image_array = arr
-
-        else:
-
-            self.image_array = np.array(
-                Image.open(file)
-            )
+            return
 
         self.redraw()
 
@@ -1411,38 +1418,16 @@ class MooringPlanner:
         Load a drawing file into memory for display as the plan background.
         """
 
-        self.project.background_file = filename
-
         if filename.lower().endswith(".pdf"):
-
-            doc = fitz.open(filename)
-            page = doc.load_page(0)
-
-            pix = page.get_pixmap(
-                matrix=fitz.Matrix(6.0, 6.0)
-            )
-
-            arr = np.frombuffer(
-                pix.samples,
-                dtype=np.uint8
-            )
-
-            arr = arr.reshape(
-                pix.height,
-                pix.width,
-                pix.n
-            )
-
-            if pix.n == 4:
-                arr = arr[:, :, :3]
-
-            self.image_array = arr
+            self.image_array = pdf_first_page_to_array(filename)
 
         else:
 
             self.image_array = np.array(
                 Image.open(filename)
             )
+
+        self.project.background_file = filename
 
     def nearest_marker_target(self, x, y):
         """Find the closest bollard or fender within 10 screen pixels."""

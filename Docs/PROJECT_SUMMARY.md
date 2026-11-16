@@ -83,7 +83,7 @@ Closing with unsaved project changes prompts to save and close, close without sa
 ## Implemented interactions
 
 - **Add Fender** places orange diamond markers named `F1`, `F2`, etc. Fenders support **Move**, **Delete**, renumbering, undo/redo, project save/load, and unsaved-change detection. They are included in the plan image and a separate `fenders.csv`, but are not mooring-line endpoints or entries in the bollard CSV or analysis YAML. Clear Barge/Quay do not delete fenders. Older project files load with no fenders.
-- Load raster drawings (`png`, `jpg`, `jpeg`, `bmp`, `tif`) and the first page of a PDF.
+- Load raster drawings (`png`, `jpg`, `jpeg`, `bmp`, `tif`) and the first page of a PDF. Ghostscript renders PDFs at 144 DPI for faster background loading.
 - Set scale, origin, and positive X-axis.
 - Add barge and quay bollards; add a mooring line by selecting a barge bollard and then a quay bollard and naming the line.
 - Move bollards and fenders by dragging them. **Move** chooses the closest marker centre within 10 screen pixels at any zoom level. Mooring lines use endpoint names, so they render from the bollards' updated positions.
